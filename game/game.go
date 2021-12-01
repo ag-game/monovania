@@ -82,22 +82,10 @@ func NewGame() (*game, error) {
 	g.audioContext = audio.NewContext(sampleRate)
 
 	// TODO replace with fs embed
-	g.changeMap("/home/trevor/programming/monovania/asset/map/m1.tmx")
+	g.changeMap("map/m1.tmx")
 
-	spawnX, spawnY := -math.MaxFloat64, -math.MaxFloat64
-	for _, grp := range world.World.ObjectGroups {
-		if grp.Name == "PLAYERSPAWN" {
-			for _, obj := range grp.Objects {
-				spawnX, spawnY = obj.X, obj.Y-1
-			}
-			break
-		}
-	}
-	if spawnX == -math.MaxFloat64 || spawnY == -math.MaxFloat64 {
-		panic("world does not contain a player spawn object")
-	}
-
-	g.player = entity.NewPlayer(spawnX, spawnY)
+	world.World.Player = entity.NewPlayer(world.World.SpawnX, world.World.SpawnY)
+	g.player = world.World.Player
 
 	g.addSystems()
 
@@ -124,6 +112,7 @@ func (g *game) Layout(outsideWidth, outsideHeight int) (int, int) {
 	s := ebiten.DeviceScaleFactor()
 	w, h := int(s*float64(outsideWidth)), int(s*float64(outsideHeight))
 	if w != g.w || h != g.h {
+		world.World.ScreenW, world.World.ScreenH = w, h
 		g.w, g.h = w, h
 		g.movementSystem.ScreenW, g.movementSystem.ScreenH = float64(w), float64(h)
 		g.renderSystem.ScreenW, g.renderSystem.ScreenH = w, h
@@ -164,10 +153,14 @@ func (g *game) addSystems() {
 
 	gohan.AddSystem(system.NewFireWeaponSystem(g.player))
 
+	gohan.AddSystem(system.NewRenderBackgroundSystem())
+
 	g.renderSystem = system.NewRenderSystem()
 	gohan.AddSystem(g.renderSystem)
 
 	gohan.AddSystem(system.NewRenderDebugTextSystem(g.player))
+
+	gohan.AddSystem(system.NewProfileSystem(g.player))
 }
 
 func (g *game) loadAssets() error {

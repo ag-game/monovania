@@ -3,6 +3,8 @@ package system
 import (
 	"time"
 
+	"code.rocketnine.space/tslocum/monovania/asset"
+
 	"code.rocketnine.space/tslocum/monovania/world"
 
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
@@ -13,8 +15,9 @@ import (
 )
 
 type playerMoveSystem struct {
-	player   gohan.Entity
-	movement *MovementSystem
+	player       gohan.Entity
+	movement     *MovementSystem
+	lastWalkDirL bool
 }
 
 func NewPlayerMoveSystem(player gohan.Entity, m *MovementSystem) *playerMoveSystem {
@@ -34,7 +37,11 @@ func (s *playerMoveSystem) Update(e gohan.Entity) error {
 		if world.World.Debug > 2 {
 			world.World.Debug = 0
 		}
-		s.movement.UpdateDrawnRects()
+		s.movement.UpdateDebugCollisionRects()
+		return nil
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyControl) && inpututil.IsKeyJustPressed(ebiten.KeyN) {
+		world.World.NoClip = !world.World.NoClip
 		return nil
 	}
 
@@ -42,6 +49,13 @@ func (s *playerMoveSystem) Update(e gohan.Entity) error {
 	maxSpeed := 0.5
 	maxYSpeed := 0.5
 	const jumpVelocity = -0.75
+
+	if world.World.Debug > 0 && ebiten.IsKeyPressed(ebiten.KeyShift) {
+		maxSpeed *= 10
+		maxYSpeed = 40
+	}
+
+	var walkKeyPressed bool
 
 	velocity := component.Velocity(s.player)
 	if ebiten.IsKeyPressed(ebiten.KeyA) {
@@ -52,6 +66,19 @@ func (s *playerMoveSystem) Update(e gohan.Entity) error {
 				velocity.X -= moveSpeed
 			}
 		}
+
+		sprite := component.Sprite(s.player)
+		sprite.Frames = []*ebiten.Image{
+			asset.PlayerSS.WalkL1,
+			asset.PlayerSS.IdleL,
+			asset.PlayerSS.WalkL2,
+			asset.PlayerSS.IdleL,
+		}
+		sprite.NumFrames = 4
+		sprite.FrameTime = 150 * time.Millisecond
+
+		walkKeyPressed = true
+		s.lastWalkDirL = true
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyD) {
 		if velocity.X < maxSpeed {
@@ -61,17 +88,56 @@ func (s *playerMoveSystem) Update(e gohan.Entity) error {
 				velocity.X += moveSpeed
 			}
 		}
+
+		sprite := component.Sprite(s.player)
+		sprite.Frames = []*ebiten.Image{
+			asset.PlayerSS.WalkR1,
+			asset.PlayerSS.IdleR,
+			asset.PlayerSS.WalkR2,
+			asset.PlayerSS.IdleR,
+		}
+		sprite.NumFrames = 4
+		sprite.FrameTime = 150 * time.Millisecond
+
+		walkKeyPressed = true
+		s.lastWalkDirL = false
 	}
-	if s.movement.OnLadder != -1 {
+	if s.movement.OnLadder != -1 || world.World.NoClip {
+		setLadderFrames := func() {
+			sprite := component.Sprite(s.player)
+			if s.lastWalkDirL {
+				sprite.Frames = []*ebiten.Image{
+					asset.PlayerSS.WalkL1,
+					asset.PlayerSS.IdleL,
+					asset.PlayerSS.WalkL2,
+					asset.PlayerSS.IdleL,
+				}
+			} else {
+				sprite.Frames = []*ebiten.Image{
+					asset.PlayerSS.WalkR1,
+					asset.PlayerSS.IdleR,
+					asset.PlayerSS.WalkR2,
+					asset.PlayerSS.IdleR,
+				}
+			}
+			sprite.NumFrames = 4
+			sprite.FrameTime = 150 * time.Millisecond
+		}
 		if ebiten.IsKeyPressed(ebiten.KeyW) {
 			if velocity.Y > -maxYSpeed {
 				velocity.Y -= moveSpeed
 			}
+
+			setLadderFrames()
+			walkKeyPressed = true
 		}
-		if ebiten.IsKeyPressed(ebiten.KeyS) {
+		if ebiten.IsKeyPressed(ebiten.KeyS) && s.movement.OnGround == -1 {
 			if velocity.Y < maxYSpeed {
 				velocity.Y += moveSpeed
 			}
+
+			setLadderFrames()
+			walkKeyPressed = true
 		}
 	} else {
 		// Jump.
@@ -83,6 +149,24 @@ func (s *playerMoveSystem) Update(e gohan.Entity) error {
 
 		if s.movement.Jumping && (!ebiten.IsKeyPressed(ebiten.KeyW) || time.Since(s.movement.LastJump) >= 200*time.Millisecond) {
 			s.movement.Jumping = false
+		}
+	}
+
+	if !walkKeyPressed || (s.movement.OnGround == -1 && s.movement.OnLadder == -1) {
+		sprite := component.Sprite(s.player)
+		sprite.NumFrames = 0
+		if s.lastWalkDirL {
+			if s.movement.OnGround == -1 && s.movement.OnLadder == -1 {
+				sprite.Image = asset.PlayerSS.WalkL2
+			} else {
+				sprite.Image = asset.PlayerSS.IdleL
+			}
+		} else {
+			if s.movement.OnGround == -1 && s.movement.OnLadder == -1 {
+				sprite.Image = asset.PlayerSS.WalkR2
+			} else {
+				sprite.Image = asset.PlayerSS.IdleR
+			}
 		}
 	}
 

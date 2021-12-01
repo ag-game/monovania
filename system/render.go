@@ -2,6 +2,11 @@ package system
 
 import (
 	_ "image/png"
+	"time"
+
+	"golang.org/x/image/colornames"
+
+	"code.rocketnine.space/tslocum/monovania/world"
 
 	"code.rocketnine.space/tslocum/gohan"
 	"code.rocketnine.space/tslocum/monovania/component"
@@ -98,7 +103,7 @@ func (s *RenderSystem) renderSprite(x float64, y float64, offsetx float64, offse
 	s.op.ColorM.Scale(colorScale, colorScale, colorScale, alpha)
 
 	// Apply monochrome filter.
-	s.op.ColorM.ChangeHSV(1, 0, 1)
+	//s.op.ColorM.ChangeHSV(1, 0, 1)
 
 	target.DrawImage(sprite, s.op)
 
@@ -108,10 +113,31 @@ func (s *RenderSystem) renderSprite(x float64, y float64, offsetx float64, offse
 }
 
 func (s *RenderSystem) Draw(entity gohan.Entity, screen *ebiten.Image) error {
+	if world.World.GameOver {
+		if entity == world.World.Player {
+			screen.Fill(colornames.Darkred)
+		}
+		return nil
+	}
+
 	position := component.Position(entity)
 	sprite := component.Sprite(entity)
 
+	if sprite.NumFrames > 0 && time.Since(sprite.LastFrame) > sprite.FrameTime {
+		sprite.Frame++
+		if sprite.Frame >= sprite.NumFrames {
+			sprite.Frame = 0
+		}
+		sprite.Image = sprite.Frames[sprite.Frame]
+		sprite.LastFrame = time.Now()
+	}
+
+	colorScale := 1.0
+	if sprite.OverrideColorScale {
+		colorScale = sprite.ColorScale
+	}
+
 	var drawn int
-	drawn += s.renderSprite(position.X, position.Y, 0, 0, 0, 1.0, 1.0, 1.0, sprite.HorizontalFlip, sprite.VerticalFlip, sprite.Image, screen)
+	drawn += s.renderSprite(position.X, position.Y, 0, 0, 0, 1.0, colorScale, 1.0, sprite.HorizontalFlip, sprite.VerticalFlip, sprite.Image, screen)
 	return nil
 }

@@ -28,7 +28,7 @@ func NewPlayer(x, y float64) gohan.Entity {
 	player.AddComponent(weapon)
 
 	player.AddComponent(&component.SpriteComponent{
-		Image: asset.PlayerSS.Frame1,
+		Image: asset.PlayerSS.IdleR,
 	})
 
 	return player

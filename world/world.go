@@ -1,11 +1,15 @@
 package world
 
 import (
-	"bytes"
 	"fmt"
 	"image"
-	"io/ioutil"
+	"math"
+	"net/http"
 	"os"
+	"path/filepath"
+	"time"
+
+	"code.rocketnine.space/tslocum/monovania/asset"
 
 	"code.rocketnine.space/tslocum/gohan"
 	"code.rocketnine.space/tslocum/monovania/component"
@@ -13,22 +17,34 @@ import (
 	"github.com/lafriks/go-tiled"
 )
 
-var World = &GameWorld{}
-
-type GameWorld struct {
-	Map          *tiled.Map
-	ObjectGroups []*tiled.ObjectGroup
-	Debug        int
+var World = &GameWorld{
+	StartedAt: time.Now(),
 }
 
-func tileToGameCoords(x, y int) (float64, float64) {
+type GameWorld struct {
+	Map              *tiled.Map
+	SpawnX, SpawnY   float64
+	ObjectGroups     []*tiled.ObjectGroup
+	StartedAt        time.Time
+	GameOver         bool
+	Player           gohan.Entity
+	ScreenW, ScreenH int
+	NoClip           bool
+	Debug            int
+}
+
+func TileToGameCoords(x, y int) (float64, float64) {
 	//return float64(x) * 16, float64(g.currentMap.Height*16) - float64(y)*16 - 16
 	return float64(x) * 16, float64(y) * 16
 }
 
 func LoadMap(filePath string) {
+	loader := tiled.Loader{
+		FileSystem: http.FS(asset.FS),
+	}
+
 	// Parse .tmx file.
-	m, err := tiled.LoadFromFile(filePath)
+	m, err := loader.LoadFromFile(filePath)
 	if err != nil {
 		fmt.Printf("error parsing world: %s", err.Error())
 		os.Exit(2)
@@ -38,13 +54,14 @@ func LoadMap(filePath string) {
 
 	tileset := m.Tilesets[0]
 
-	imgPath := tileset.GetFileFullPath(tileset.Image.Source)
-	b, err := ioutil.ReadFile(imgPath)
+	imgPath := filepath.Join("./map/", tileset.Image.Source)
+	f, err := asset.FS.Open(imgPath)
 	if err != nil {
 		panic(err)
 	}
+	defer f.Close()
 
-	img, _, err := image.Decode(bytes.NewReader(b))
+	img, _, err := image.Decode(f)
 	if err != nil {
 		panic(err)
 	}
@@ -57,6 +74,25 @@ func LoadMap(filePath string) {
 		rect := tileset.GetTileRect(i)
 		tileCache[i+tileset.FirstGID] = tilesetImg.SubImage(rect).(*ebiten.Image)
 	}
+
+	createTileEntity := func(t *tiled.LayerTile, x int, y int) gohan.Entity {
+		tileX, tileY := TileToGameCoords(x, y)
+
+		mapTile := gohan.NewEntity()
+		mapTile.AddComponent(&component.PositionComponent{
+			X: tileX,
+			Y: tileY,
+		})
+		mapTile.AddComponent(&component.SpriteComponent{
+			Image:          tileCache[t.Tileset.FirstGID+t.ID],
+			HorizontalFlip: t.HorizontalFlip,
+			VerticalFlip:   t.VerticalFlip,
+			DiagonalFlip:   t.DiagonalFlip,
+		})
+
+		return mapTile
+	}
+
 	var t *tiled.LayerTile
 	for _, layer := range m.Layers {
 		for y := 0; y < m.Height; y++ {
@@ -74,19 +110,7 @@ func LoadMap(filePath string) {
 					continue
 				}
 
-				tileX, tileY := tileToGameCoords(x, y)
-
-				mapTile := gohan.NewEntity()
-				mapTile.AddComponent(&component.PositionComponent{
-					X: tileX,
-					Y: tileY,
-				})
-				mapTile.AddComponent(&component.SpriteComponent{
-					Image:          tileImg,
-					HorizontalFlip: t.HorizontalFlip,
-					VerticalFlip:   t.VerticalFlip,
-					DiagonalFlip:   t.DiagonalFlip,
-				})
+				_ = createTileEntity(t, x, y)
 			}
 		}
 	}
@@ -112,4 +136,44 @@ func LoadMap(filePath string) {
 
 	World.Map = m
 	World.ObjectGroups = objects
+
+	World.SpawnX, World.SpawnY = -math.MaxFloat64, -math.MaxFloat64
+	for _, grp := range World.ObjectGroups {
+		if grp.Name == "PLAYERSPAWN" {
+			for _, obj := range grp.Objects {
+				World.SpawnX, World.SpawnY = obj.X, obj.Y-1
+			}
+			break
+		}
+	}
+	for _, grp := range World.ObjectGroups {
+		if !grp.Visible {
+			continue
+		}
+		if grp.Name == "TEMPSPAWN" {
+			for _, obj := range grp.Objects {
+				World.SpawnX, World.SpawnY = obj.X, obj.Y-1
+			}
+			break
+		}
+	}
+	if World.SpawnX == -math.MaxFloat64 || World.SpawnY == -math.MaxFloat64 {
+		panic("world does not contain a player spawn object")
+	}
+
+	for _, grp := range World.ObjectGroups {
+		if grp.Name == "TRIGGERS" {
+			for _, obj := range grp.Objects {
+				mapTile := gohan.NewEntity()
+				mapTile.AddComponent(&component.PositionComponent{
+					X: obj.X,
+					Y: obj.Y - 16,
+				})
+				mapTile.AddComponent(&component.SpriteComponent{
+					Image: tileCache[obj.GID],
+				})
+			}
+			break
+		}
+	}
 }

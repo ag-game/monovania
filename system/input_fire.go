@@ -47,6 +47,8 @@ func (s *fireWeaponSystem) fire(weapon *component.WeaponComponent, position *com
 }
 
 func (s *fireWeaponSystem) Update(_ gohan.Entity) error {
+	return nil // TODO
+
 	weapon := component.Weapon(s.player)
 
 	if weapon.Ammo <= 0 {

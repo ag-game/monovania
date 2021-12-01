@@ -3,8 +3,6 @@ package system
 import (
 	"image"
 	"image/color"
-	"log"
-	"strings"
 	"time"
 
 	"code.rocketnine.space/tslocum/monovania/world"
@@ -24,54 +22,79 @@ type MovementSystem struct {
 	Jumping  bool
 	LastJump time.Time
 
-	collisionIndex int
 	collisionRects []image.Rectangle
 
 	ladderRects []image.Rectangle
 
-	debugRects []gohan.Entity
+	fireRects []image.Rectangle
+
+	debugCollisionRects []gohan.Entity
+	debugLadderRects    []gohan.Entity
 }
 
 func NewMovementSystem() *MovementSystem {
 	s := &MovementSystem{
-		collisionIndex: -1,
-		OnGround:       -1,
-		OnLadder:       -1,
+		OnGround: -1,
+		OnLadder: -1,
 	}
 
 	w := world.World
 
 	// Cache collision rects.
 
-	for i, objectLayer := range w.ObjectGroups {
-		if strings.ToLower(objectLayer.Name) == "collisions" {
-			s.collisionIndex = i
-			break
+	m := w.Map
+	for _, layer := range m.Layers {
+		collision := layer.Properties.GetBool("collision")
+		if !collision {
+			continue
 		}
-	}
-	if s.collisionIndex == -1 {
-		log.Fatal("no collisions")
-		return s
-	}
 
-	for _, object := range w.ObjectGroups[s.collisionIndex].Objects {
-		rect := objectToRect(object)
-		s.collisionRects = append(s.collisionRects, rect)
+		for y := 0; y < m.Height; y++ {
+			for x := 0; x < m.Width; x++ {
+				t := layer.Tiles[y*m.Width+x]
+				if t == nil || t.Nil {
+					continue // No tile at this position.
+				}
+				gx, gy := world.TileToGameCoords(x, y)
+				s.collisionRects = append(s.collisionRects, image.Rect(int(gx), int(gy), int(gx)+16, int(gy)+16))
+			}
+		}
 	}
 
 	// Cache ladder rects.
 
-	for _, objectLayer := range w.ObjectGroups {
-		if strings.ToLower(objectLayer.Name) == "ladders" {
-			for _, object := range objectLayer.Objects {
-				rect := objectToRect(object)
-				s.ladderRects = append(s.ladderRects, rect)
+	for _, layer := range m.Layers {
+		ladder := layer.Properties.GetBool("ladder")
+		if !ladder {
+			continue
+		}
+
+		for y := 0; y < m.Height; y++ {
+			for x := 0; x < m.Width; x++ {
+				t := layer.Tiles[y*m.Width+x]
+				if t == nil || t.Nil {
+					continue // No tile at this position.
+				}
+				gx, gy := world.TileToGameCoords(x, y)
+				s.ladderRects = append(s.ladderRects, image.Rect(int(gx), int(gy), int(gx)+16, int(gy)+16))
 			}
-			break
 		}
 	}
 
-	s.UpdateDrawnRects()
+	// Cache fire rects.
+
+	for _, layer := range world.World.ObjectGroups {
+		if layer.Name != "FIRES" {
+			continue
+		}
+
+		for _, obj := range layer.Objects {
+			rect := objectToRect(obj)
+			s.fireRects = append(s.fireRects, rect)
+		}
+	}
+
+	s.UpdateDebugCollisionRects()
 
 	return s
 }
@@ -93,40 +116,66 @@ func drawDebugRect(r image.Rectangle, c color.Color) gohan.Entity {
 	})
 
 	rectEntity.AddComponent(&component.SpriteComponent{
-		Image: rectImg,
+		Image:              rectImg,
+		OverrideColorScale: true,
 	})
 
 	return rectEntity
 }
 
-func (s *MovementSystem) UpdateDrawnRects() {
-	for _, e := range s.debugRects {
+func (s *MovementSystem) removeDebugRects() {
+	for _, e := range s.debugCollisionRects {
 		e.Remove()
 	}
+	s.debugCollisionRects = nil
+
+	for _, e := range s.debugLadderRects {
+		e.Remove()
+	}
+	s.debugLadderRects = nil
+}
+
+func (s *MovementSystem) addDebugCollisionRects() {
+	s.removeDebugRects()
+
+	for _, rect := range s.collisionRects {
+		c := color.RGBA{200, 200, 200, 150}
+		debugRect := drawDebugRect(rect, c)
+		s.debugCollisionRects = append(s.debugCollisionRects, debugRect)
+	}
+
+	for _, rect := range s.ladderRects {
+		c := color.RGBA{200, 200, 200, 150}
+		debugRect := drawDebugRect(rect, c)
+		s.debugLadderRects = append(s.debugLadderRects, debugRect)
+	}
+}
+
+func (s *MovementSystem) UpdateDebugCollisionRects() {
 	if world.World.Debug < 2 {
+		s.removeDebugRects()
 		return
+	} else if len(s.debugCollisionRects) == 0 {
+		s.addDebugCollisionRects()
 	}
 
-	collideColor := color.RGBA{255, 255, 255, 200}
-
-	for i, rect := range s.collisionRects {
-		c := color.RGBA{200, 200, 200, 80}
+	for i, debugRect := range s.debugCollisionRects {
+		sprite := component.Sprite(debugRect)
 		if s.OnGround == i {
-			c = collideColor
+			sprite.ColorScale = 1
+		} else {
+			sprite.ColorScale = 0.4
 		}
-		debugRect := drawDebugRect(rect, c)
-		s.debugRects = append(s.debugRects, debugRect)
 	}
 
-	for i, rect := range s.ladderRects {
-		c := color.RGBA{200, 200, 200, 80}
+	for i, debugRect := range s.debugLadderRects {
+		sprite := component.Sprite(debugRect)
 		if s.OnLadder == i {
-			c = collideColor
+			sprite.ColorScale = 1
+		} else {
+			sprite.ColorScale = 0.4
 		}
-		debugRect := drawDebugRect(rect, c)
-		s.debugRects = append(s.debugRects, debugRect)
 	}
-
 }
 
 func (s *MovementSystem) objectToGameCoords(x, y, height float64) (float64, float64) {
@@ -138,6 +187,20 @@ func (_ *MovementSystem) Matches(entity gohan.Entity) bool {
 	velocity := entity.Component(component.VelocityComponentID)
 
 	return position != nil && velocity != nil
+}
+
+func (s *MovementSystem) checkFire(r image.Rectangle) {
+	for _, fireRect := range s.fireRects {
+		if r.Overlaps(fireRect) {
+			//world.World.GameOver = true
+			// TODO
+			position := component.Position(world.World.Player)
+			velocity := component.Velocity(world.World.Player)
+			position.X, position.Y = world.World.SpawnX, world.World.SpawnY
+			velocity.X, velocity.Y = 0, 0
+			return
+		}
+	}
 }
 
 func (s *MovementSystem) Update(entity gohan.Entity) error {
@@ -171,7 +234,10 @@ func (s *MovementSystem) Update(entity gohan.Entity) error {
 	const maxGravity = 9
 	const gravityAccel = 0.04
 	if bullet == nil {
-		if s.OnLadder != -1 {
+		if s.OnLadder != -1 || world.World.NoClip {
+			velocity.X *= decel
+			velocity.Y *= decel
+		} else if s.OnLadder != -1 {
 			velocity.X *= decel
 			velocity.Y *= ladderDecel
 		} else if velocity.Y < maxGravity {
@@ -197,17 +263,24 @@ func (s *MovementSystem) Update(entity gohan.Entity) error {
 	playerRectXY := image.Rect(int(position.X+velocity.X), int(position.Y+velocity.Y), int(position.X+velocity.X)+16, int(position.Y+velocity.Y)+17)
 	playerRectG := image.Rect(int(position.X), int(position.Y+threshold), int(position.X)+16, int(position.Y+threshold)+17)
 	for i, rect := range s.collisionRects {
+		if world.World.NoClip {
+			continue
+		}
 		if playerRectX.Overlaps(rect) {
 			collideX = i
+			s.checkFire(playerRectX)
 		}
 		if playerRectY.Overlaps(rect) {
 			collideY = i
+			s.checkFire(playerRectY)
 		}
 		if playerRectXY.Overlaps(rect) {
 			collideXY = i
+			s.checkFire(playerRectXY)
 		}
 		if playerRectG.Overlaps(rect) {
 			collideG = i
+			s.checkFire(playerRectG)
 		}
 	}
 	if collideXY == -1 {
@@ -226,7 +299,7 @@ func (s *MovementSystem) Update(entity gohan.Entity) error {
 	// Update debug rects.
 
 	if s.OnGround != lastOnGround || s.OnLadder != lastOnLadder {
-		s.UpdateDrawnRects()
+		s.UpdateDebugCollisionRects()
 	}
 
 	return nil

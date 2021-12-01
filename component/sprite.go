@@ -1,6 +1,8 @@
 package component
 
 import (
+	"time"
+
 	"code.rocketnine.space/tslocum/gohan"
 	"github.com/hajimehoshi/ebiten/v2"
 )
@@ -10,6 +12,15 @@ type SpriteComponent struct {
 	HorizontalFlip bool
 	VerticalFlip   bool
 	DiagonalFlip   bool // TODO unimplemented
+
+	Frame     int
+	Frames    []*ebiten.Image
+	FrameTime time.Duration
+	LastFrame time.Time
+	NumFrames int
+
+	OverrideColorScale bool
+	ColorScale         float64
 }
 
 var SpriteComponentID = gohan.NewComponentID()
