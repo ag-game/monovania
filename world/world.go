@@ -40,6 +40,8 @@ type GameWorld struct {
 	TriggerRects    []image.Rectangle
 	TriggerEntities []gohan.Entity
 	TriggerNames    []string
+
+	DisableEsc bool // TODO
 }
 
 func TileToGameCoords(x, y int) (float64, float64) {

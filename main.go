@@ -2,7 +2,6 @@ package main
 
 import (
 	"bufio"
-	"flag"
 	"log"
 	"os"
 	"os/signal"
@@ -11,7 +10,6 @@ import (
 	"syscall"
 
 	"code.rocketnine.space/tslocum/monovania/game"
-	"code.rocketnine.space/tslocum/monovania/world"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -24,27 +22,12 @@ func main() {
 	ebiten.SetFPSMode(ebiten.FPSModeVsyncOn)
 	ebiten.SetCursorShape(ebiten.CursorShapeCrosshair)
 
-	var fullscreen bool
-	var doublejump bool
-	flag.BoolVar(&fullscreen, "fullscreen", false, "run in fullscreen mode")
-	flag.BoolVar(&doublejump, "doublejump", false, "start with double jump ability")
-	flag.IntVar(&world.World.Debug, "debug", 0, "print debug information")
-	flag.Parse()
-
 	g, err := game.NewGame()
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	if fullscreen {
-		ebiten.SetFullscreen(true)
-	}
-
-	if doublejump {
-		world.World.CanDoubleJump = true
-	}
-
-	//parseFlags(g)
+	parseFlags()
 
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc,
