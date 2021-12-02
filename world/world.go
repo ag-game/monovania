@@ -31,6 +31,15 @@ type GameWorld struct {
 	ScreenW, ScreenH int
 	NoClip           bool
 	Debug            int
+
+	// Abilities
+	CanDoubleJump bool
+
+	Jumps int
+
+	TriggerRects    []image.Rectangle
+	TriggerEntities []gohan.Entity
+	TriggerNames    []string
 }
 
 func TileToGameCoords(x, y int) (float64, float64) {
@@ -164,6 +173,10 @@ func LoadMap(filePath string) {
 	for _, grp := range World.ObjectGroups {
 		if grp.Name == "TRIGGERS" {
 			for _, obj := range grp.Objects {
+				if obj.Name == "" {
+					continue
+				}
+
 				mapTile := gohan.NewEntity()
 				mapTile.AddComponent(&component.PositionComponent{
 					X: obj.X,
@@ -172,8 +185,17 @@ func LoadMap(filePath string) {
 				mapTile.AddComponent(&component.SpriteComponent{
 					Image: tileCache[obj.GID],
 				})
+
+				World.TriggerNames = append(World.TriggerNames, obj.Name)
+				World.TriggerEntities = append(World.TriggerEntities, mapTile)
+				World.TriggerRects = append(World.TriggerRects, ObjectToRect(obj))
 			}
 			break
 		}
 	}
+}
+
+func ObjectToRect(o *tiled.Object) image.Rectangle {
+	x, y, w, h := int(o.X), int(o.Y), int(o.Width), int(o.Height)
+	return image.Rect(x, y, x+w, y+h)
 }

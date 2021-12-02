@@ -2,6 +2,7 @@ package game
 
 import (
 	"image/color"
+	"log"
 	"math"
 	"os"
 	"sync"
@@ -165,6 +166,12 @@ func (g *game) addSystems() {
 
 func (g *game) loadAssets() error {
 	return nil
+}
+
+func (g *game) WarpTo(x, y float64) {
+	position := component.Position(world.World.Player)
+	position.X, position.Y = x, y
+	log.Printf("Warped to %.2f,%.2f", x, y)
 }
 
 func (g *game) Exit() {

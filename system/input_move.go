@@ -48,7 +48,7 @@ func (s *playerMoveSystem) Update(e gohan.Entity) error {
 	moveSpeed := 0.1
 	maxSpeed := 0.5
 	maxYSpeed := 0.5
-	const jumpVelocity = -0.75
+	const jumpVelocity = -1
 
 	if world.World.Debug > 0 && ebiten.IsKeyPressed(ebiten.KeyShift) {
 		maxSpeed *= 10
@@ -141,10 +141,13 @@ func (s *playerMoveSystem) Update(e gohan.Entity) error {
 		}
 	} else {
 		// Jump.
-		if s.movement.OnGround != -1 && inpututil.IsKeyJustPressed(ebiten.KeyW) {
-			velocity.Y = jumpVelocity
-			s.movement.Jumping = true
-			s.movement.LastJump = time.Now()
+		if inpututil.IsKeyJustPressed(ebiten.KeyW) {
+			if (s.movement.OnGround != -1 && world.World.Jumps == 0) || (world.World.CanDoubleJump && world.World.Jumps == 1) {
+				velocity.Y = jumpVelocity
+				s.movement.Jumping = true
+				s.movement.LastJump = time.Now()
+				world.World.Jumps++
+			}
 		}
 
 		if s.movement.Jumping && (!ebiten.IsKeyPressed(ebiten.KeyW) || time.Since(s.movement.LastJump) >= 200*time.Millisecond) {

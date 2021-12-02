@@ -1,0 +1,31 @@
+project_name: monovania
+
+builds:
+  -
+    id: monovania
+#    ldflags:
+#      - -s -w -X code.rocketnine.space/tslocum/monovania/main.Version={{.Version}}
+    goos:
+      - js
+      - linux
+      - windows
+    goarch:
+      - amd64
+      - wasm
+archives:
+  -
+    id: monovania
+    builds:
+      - monovania
+    replacements:
+      386: i386
+    format_overrides:
+      - goos: js
+        format: zip
+      - goos: windows
+        format: zip
+    files:
+      - ./*.md
+      - LICENSE
+checksum:
+  name_template: 'checksums.txt'

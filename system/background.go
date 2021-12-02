@@ -42,7 +42,7 @@ func (s *RenderBackgroundSystem) Draw(entity gohan.Entity, screen *ebiten.Image)
 
 	pctX, pctY := position.X/(512*16), position.Y/(512*16)
 
-	scale := (float64(world.World.ScreenH) / float64(asset.ImgBackground1.Bounds().Dy())) * 1.7
+	scale := (float64(world.World.ScreenH) / float64(asset.ImgBackground1.Bounds().Dy())) * 1.675
 	offsetX, offsetY := float64(asset.ImgBackground1.Bounds().Dx())*pctX, float64(asset.ImgBackground1.Bounds().Dy())*pctY
 
 	op := &ebiten.DrawImageOptions{}
@@ -54,11 +54,11 @@ func (s *RenderBackgroundSystem) Draw(entity gohan.Entity, screen *ebiten.Image)
 	screen.DrawImage(asset.ImgBackground2, op)
 	op = &ebiten.DrawImageOptions{}
 	op.GeoM.Scale(scale, scale)
-	op.GeoM.Translate(-offsetX*1, -offsetY*0.75)
+	op.GeoM.Translate(-offsetX*0.75, -offsetY*0.75)
 	screen.DrawImage(asset.ImgBackground3, op)
 	op = &ebiten.DrawImageOptions{}
 	op.GeoM.Scale(scale, scale)
-	op.GeoM.Translate(-offsetX*2, -offsetY)
+	op.GeoM.Translate(-offsetX, -offsetY)
 	screen.DrawImage(asset.ImgBackground4, op)
 	return nil
 }

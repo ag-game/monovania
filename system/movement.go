@@ -10,7 +10,6 @@ import (
 	"code.rocketnine.space/tslocum/gohan"
 	"code.rocketnine.space/tslocum/monovania/component"
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/lafriks/go-tiled"
 )
 
 type MovementSystem struct {
@@ -89,7 +88,7 @@ func NewMovementSystem() *MovementSystem {
 		}
 
 		for _, obj := range layer.Objects {
-			rect := objectToRect(obj)
+			rect := world.ObjectToRect(obj)
 			s.fireRects = append(s.fireRects, rect)
 		}
 	}
@@ -97,11 +96,6 @@ func NewMovementSystem() *MovementSystem {
 	s.UpdateDebugCollisionRects()
 
 	return s
-}
-
-func objectToRect(o *tiled.Object) image.Rectangle {
-	x, y, w, h := int(o.X), int(o.Y), int(o.Width), int(o.Height)
-	return image.Rect(x, y, x+w, y+h)
 }
 
 func drawDebugRect(r image.Rectangle, c color.Color) gohan.Entity {
@@ -203,6 +197,31 @@ func (s *MovementSystem) checkFire(r image.Rectangle) {
 	}
 }
 
+func (s *MovementSystem) checkTriggers(r image.Rectangle) {
+	for i, triggerRect := range world.World.TriggerRects {
+		if r.Overlaps(triggerRect) {
+			if world.World.TriggerNames[i] == "DOUBLEJUMP" {
+				world.World.CanDoubleJump = true
+			} else {
+				panic("unknown trigger " + world.World.TriggerNames[i])
+			}
+
+			// Remove trigger.
+			world.World.TriggerEntities[i].Remove()
+
+			world.World.TriggerRects = append(world.World.TriggerRects[:i], world.World.TriggerRects[i+1:]...)
+			world.World.TriggerEntities = append(world.World.TriggerEntities[:i], world.World.TriggerEntities[i+1:]...)
+			world.World.TriggerNames = append(world.World.TriggerNames[:i], world.World.TriggerNames[i+1:]...)
+			return
+		}
+	}
+}
+
+func (s *MovementSystem) checkCollisions(r image.Rectangle) {
+	s.checkFire(r)
+	s.checkTriggers(r)
+}
+
 func (s *MovementSystem) Update(entity gohan.Entity) error {
 	lastOnGround := s.OnGround
 	lastOnLadder := s.OnLadder
@@ -257,7 +276,7 @@ func (s *MovementSystem) Update(entity gohan.Entity) error {
 		collideXY = -1
 		collideG  = -1
 	)
-	const threshold = 2
+	const threshold = 0.1
 	playerRectX := image.Rect(int(position.X+velocity.X), int(position.Y), int(position.X+velocity.X)+16, int(position.Y)+17)
 	playerRectY := image.Rect(int(position.X), int(position.Y+velocity.Y), int(position.X)+16, int(position.Y+velocity.Y)+17)
 	playerRectXY := image.Rect(int(position.X+velocity.X), int(position.Y+velocity.Y), int(position.X+velocity.X)+16, int(position.Y+velocity.Y)+17)
@@ -268,19 +287,19 @@ func (s *MovementSystem) Update(entity gohan.Entity) error {
 		}
 		if playerRectX.Overlaps(rect) {
 			collideX = i
-			s.checkFire(playerRectX)
+			s.checkCollisions(playerRectX)
 		}
 		if playerRectY.Overlaps(rect) {
 			collideY = i
-			s.checkFire(playerRectY)
+			s.checkCollisions(playerRectY)
 		}
 		if playerRectXY.Overlaps(rect) {
 			collideXY = i
-			s.checkFire(playerRectXY)
+			s.checkCollisions(playerRectXY)
 		}
 		if playerRectG.Overlaps(rect) {
 			collideG = i
-			s.checkFire(playerRectG)
+			s.checkCollisions(playerRectG)
 		}
 	}
 	if collideXY == -1 {
@@ -295,6 +314,10 @@ func (s *MovementSystem) Update(entity gohan.Entity) error {
 		velocity.X, velocity.Y = 0, 0
 	}
 	s.OnGround = collideG
+	// Reset jump counter.
+	if s.OnGround != -1 && world.World.Jumps != 0 && time.Since(s.LastJump) >= 50*time.Millisecond {
+		world.World.Jumps = 0
+	}
 
 	// Update debug rects.
 
