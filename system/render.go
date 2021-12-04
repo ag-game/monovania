@@ -137,7 +137,8 @@ func (s *RenderSystem) Draw(entity gohan.Entity, screen *ebiten.Image) error {
 		colorScale = sprite.ColorScale
 	}
 
+	// TODO
 	var drawn int
-	drawn += s.renderSprite(position.X, position.Y, 0, 0, 0, 1.0, colorScale, 1.0, sprite.HorizontalFlip, sprite.VerticalFlip, sprite.Image, screen)
+	drawn += s.renderSprite(position.X+world.World.OffsetX, position.Y+world.World.OffsetY, 0, 0, 0, 1.0, colorScale, 1.0, sprite.HorizontalFlip, sprite.VerticalFlip, sprite.Image, screen)
 	return nil
 }

@@ -12,6 +12,7 @@ require (
 )
 
 require (
+	github.com/fogleman/ease v0.0.0-20170301025033-8da417bf1776 // indirect
 	github.com/go-gl/glfw/v3.3/glfw v0.0.0-20211024062804-40e447a793be // indirect
 	github.com/hajimehoshi/oto/v2 v2.1.0-alpha.4 // indirect
 	github.com/jezek/xgb v0.0.0-20210312150743-0e0f116e1240 // indirect

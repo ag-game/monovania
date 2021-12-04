@@ -1,11 +1,11 @@
 package world
 
 import (
-	"fmt"
+	"bytes"
 	"image"
+	"log"
 	"math"
 	"net/http"
-	"os"
 	"path/filepath"
 	"time"
 
@@ -19,6 +19,8 @@ import (
 
 var World = &GameWorld{
 	StartedAt: time.Now(),
+	DuckStart: -1,
+	DuckEnd:   -1,
 }
 
 type GameWorld struct {
@@ -31,6 +33,11 @@ type GameWorld struct {
 	ScreenW, ScreenH int
 	NoClip           bool
 	Debug            int
+
+	OffsetX, OffsetY float64
+
+	DuckStart float64
+	DuckEnd   float64
 
 	// Abilities
 	CanDoubleJump bool
@@ -54,11 +61,15 @@ func LoadMap(filePath string) {
 		FileSystem: http.FS(asset.FS),
 	}
 
-	// Parse .tmx file.
-	m, err := loader.LoadFromFile(filePath)
+	b, err := asset.FS.ReadFile(filePath)
 	if err != nil {
-		fmt.Printf("error parsing world: %s", err.Error())
-		os.Exit(2)
+		panic(err)
+	}
+
+	// Parse .tmx file.
+	m, err := loader.LoadFromReader("/", bytes.NewReader(b))
+	if err != nil {
+		log.Fatalf("error parsing world: %+v", err)
 	}
 
 	// Load tileset.

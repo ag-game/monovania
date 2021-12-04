@@ -12,9 +12,11 @@ var PlayerSS = LoadPlayerSpriteSheet()
 // PlayerSpriteSheet represents a collection of sprite images.
 type PlayerSpriteSheet struct {
 	IdleR  *ebiten.Image
+	DuckR  *ebiten.Image
 	WalkR1 *ebiten.Image
 	WalkR2 *ebiten.Image
 	IdleL  *ebiten.Image
+	DuckL  *ebiten.Image
 	WalkL1 *ebiten.Image
 	WalkL2 *ebiten.Image
 }
@@ -44,9 +46,11 @@ func LoadPlayerSpriteSheet() *PlayerSpriteSheet {
 	s.IdleR = spriteAt(0, 0)
 	s.WalkR1 = spriteAt(1, 0)
 	s.WalkR2 = spriteAt(2, 0)
+	s.DuckR = spriteAt(3, 0)
 	s.IdleL = spriteAt(0, 1)
 	s.WalkL1 = spriteAt(1, 1)
 	s.WalkL2 = spriteAt(2, 1)
+	s.DuckL = spriteAt(3, 1)
 
 	return s
 }

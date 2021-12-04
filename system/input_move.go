@@ -3,6 +3,8 @@ package system
 import (
 	"time"
 
+	"github.com/fogleman/ease"
+
 	"code.rocketnine.space/tslocum/monovania/asset"
 
 	"code.rocketnine.space/tslocum/monovania/world"
@@ -58,49 +60,103 @@ func (s *playerMoveSystem) Update(e gohan.Entity) error {
 	var walkKeyPressed bool
 
 	velocity := component.Velocity(s.player)
-	if ebiten.IsKeyPressed(ebiten.KeyA) {
-		if velocity.X > -maxSpeed {
-			if s.movement.OnLadder != -1 {
-				velocity.X -= moveSpeed / 2
+	if s.movement.OnGround != -1 && ebiten.IsKeyPressed(ebiten.KeyS) && !world.World.NoClip {
+		// Duck and look down.
+		sprite := component.Sprite(s.player)
+		sprite.NumFrames = 0
+		if s.lastWalkDirL {
+			sprite.Image = asset.PlayerSS.DuckL
+		} else {
+			sprite.Image = asset.PlayerSS.DuckR
+		}
+		walkKeyPressed = true
+
+		if world.World.DuckStart == -1 {
+			if world.World.DuckEnd == -1 {
+				world.World.DuckStart = 0
 			} else {
-				velocity.X -= moveSpeed
+				world.World.DuckStart = 1 - world.World.DuckEnd
+			}
+		}
+		offset := ((float64(world.World.ScreenH) / 4) / 3) * -1
+		if world.World.OffsetY > offset {
+			pct := world.World.DuckStart
+			if pct < 0.5 {
+				pct = ease.InOutQuint(pct)
+			} else {
+				pct = ease.InOutQuint(pct)
+			}
+			world.World.OffsetY = offset * pct
+
+			if world.World.DuckStart < 1 {
+				world.World.DuckStart += 0.01
+			}
+		}
+	} else {
+		if world.World.DuckStart != -1 {
+			world.World.DuckEnd = 1 - world.World.DuckStart
+			world.World.DuckStart = -1
+		}
+		if world.World.DuckEnd != -1 {
+			offset := ((float64(world.World.ScreenH) / 4) / 3) * -1
+			pct := world.World.DuckEnd
+			if pct < 0.5 {
+				pct = ease.InOutQuint(pct)
+			} else {
+				pct = ease.InOutQuint(pct)
+			}
+			pct = 1 - pct
+			world.World.OffsetY = offset * pct
+
+			if world.World.DuckEnd < 1 {
+				world.World.DuckEnd += 0.01
 			}
 		}
 
-		sprite := component.Sprite(s.player)
-		sprite.Frames = []*ebiten.Image{
-			asset.PlayerSS.WalkL1,
-			asset.PlayerSS.IdleL,
-			asset.PlayerSS.WalkL2,
-			asset.PlayerSS.IdleL,
-		}
-		sprite.NumFrames = 4
-		sprite.FrameTime = 150 * time.Millisecond
-
-		walkKeyPressed = true
-		s.lastWalkDirL = true
-	}
-	if ebiten.IsKeyPressed(ebiten.KeyD) {
-		if velocity.X < maxSpeed {
-			if s.movement.OnLadder != -1 {
-				velocity.X += moveSpeed / 2
-			} else {
-				velocity.X += moveSpeed
+		if ebiten.IsKeyPressed(ebiten.KeyA) {
+			if velocity.X > -maxSpeed {
+				if s.movement.OnLadder != -1 {
+					velocity.X -= moveSpeed / 2
+				} else {
+					velocity.X -= moveSpeed
+				}
 			}
-		}
 
-		sprite := component.Sprite(s.player)
-		sprite.Frames = []*ebiten.Image{
-			asset.PlayerSS.WalkR1,
-			asset.PlayerSS.IdleR,
-			asset.PlayerSS.WalkR2,
-			asset.PlayerSS.IdleR,
-		}
-		sprite.NumFrames = 4
-		sprite.FrameTime = 150 * time.Millisecond
+			sprite := component.Sprite(s.player)
+			sprite.Frames = []*ebiten.Image{
+				asset.PlayerSS.WalkL1,
+				asset.PlayerSS.IdleL,
+				asset.PlayerSS.WalkL2,
+				asset.PlayerSS.IdleL,
+			}
+			sprite.NumFrames = 4
+			sprite.FrameTime = 150 * time.Millisecond
 
-		walkKeyPressed = true
-		s.lastWalkDirL = false
+			walkKeyPressed = true
+			s.lastWalkDirL = true
+		}
+		if ebiten.IsKeyPressed(ebiten.KeyD) {
+			if velocity.X < maxSpeed {
+				if s.movement.OnLadder != -1 {
+					velocity.X += moveSpeed / 2
+				} else {
+					velocity.X += moveSpeed
+				}
+			}
+
+			sprite := component.Sprite(s.player)
+			sprite.Frames = []*ebiten.Image{
+				asset.PlayerSS.WalkR1,
+				asset.PlayerSS.IdleR,
+				asset.PlayerSS.WalkR2,
+				asset.PlayerSS.IdleR,
+			}
+			sprite.NumFrames = 4
+			sprite.FrameTime = 150 * time.Millisecond
+
+			walkKeyPressed = true
+			s.lastWalkDirL = false
+		}
 	}
 	if s.movement.OnLadder != -1 || world.World.NoClip {
 		setLadderFrames := func() {
@@ -142,11 +198,15 @@ func (s *playerMoveSystem) Update(e gohan.Entity) error {
 	} else {
 		// Jump.
 		if inpututil.IsKeyJustPressed(ebiten.KeyW) {
-			if (s.movement.OnGround != -1 && world.World.Jumps == 0) || (world.World.CanDoubleJump && world.World.Jumps == 1) {
+			if (s.movement.OnGround != -1 && world.World.Jumps == 0) || (world.World.CanDoubleJump && world.World.Jumps < 2) {
 				velocity.Y = jumpVelocity
 				s.movement.Jumping = true
 				s.movement.LastJump = time.Now()
 				world.World.Jumps++
+				// Allow one double jump when falling.
+				if s.movement.OnGround == -1 {
+					world.World.Jumps++
+				}
 			}
 		}
 

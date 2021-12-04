@@ -41,15 +41,13 @@ func (s *RenderDebugTextSystem) Draw(entity gohan.Entity, screen *ebiten.Image) 
 		return nil
 	}
 
-	var drawn int
-
 	position := component.Position(s.player)
 	velocity := component.Velocity(s.player)
 
 	s.debugImg.Clear()
 	s.op.GeoM.Reset()
 	s.op.GeoM.Scale(2, 2)
-	ebitenutil.DebugPrint(s.debugImg, fmt.Sprintf("POS  %.2f,%.2f\nVEL  %.2f,%.2f\nENT  %d\nUPD  %d\nDRA  %d\nSPR  %d\nTPS  %0.0f\nFPS  %0.0f", position.X, position.Y, velocity.X, velocity.Y, gohan.ActiveEntities(), gohan.UpdatedEntities(), gohan.DrawnEntities(), drawn, ebiten.CurrentTPS(), ebiten.CurrentFPS()))
+	ebitenutil.DebugPrint(s.debugImg, fmt.Sprintf("POS  %.2f,%.2f\nVEL  %.2f,%.2f\nENT  %d\nUPD  %d\nDRA  %d\nTPS  %0.0f\nFPS  %0.0f", position.X, position.Y, velocity.X, velocity.Y, gohan.ActiveEntities(), gohan.UpdatedEntities(), gohan.DrawnEntities(), ebiten.CurrentTPS(), ebiten.CurrentFPS()))
 	screen.DrawImage(s.debugImg, s.op)
 	return nil
 }
