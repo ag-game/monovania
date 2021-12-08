@@ -4,10 +4,9 @@ import (
 	"math"
 	"time"
 
-	"code.rocketnine.space/tslocum/monovania/entity"
-
 	"code.rocketnine.space/tslocum/gohan"
 	"code.rocketnine.space/tslocum/monovania/component"
+	"code.rocketnine.space/tslocum/monovania/entity"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -25,10 +24,15 @@ func NewFireWeaponSystem(player gohan.Entity) *fireWeaponSystem {
 	}
 }
 
-func (_ *fireWeaponSystem) Matches(e gohan.Entity) bool {
-	weapon := component.Weapon(e)
+func (_ *fireWeaponSystem) Needs() []gohan.ComponentID {
+	return []gohan.ComponentID{
+		component.PositionComponentID,
+		component.WeaponComponentID,
+	}
+}
 
-	return weapon != nil
+func (_ *fireWeaponSystem) Uses() []gohan.ComponentID {
+	return nil
 }
 
 func (s *fireWeaponSystem) fire(weapon *component.WeaponComponent, position *component.PositionComponent, fireAngle float64) {
@@ -46,16 +50,16 @@ func (s *fireWeaponSystem) fire(weapon *component.WeaponComponent, position *com
 	_ = bullet
 }
 
-func (s *fireWeaponSystem) Update(_ gohan.Entity) error {
+func (s *fireWeaponSystem) Update(ctx *gohan.Context) error {
 	return nil // TODO
 
-	weapon := component.Weapon(s.player)
+	weapon := component.Weapon(ctx)
 
 	if weapon.Ammo <= 0 {
 		return nil
 	}
 
-	position := component.Position(s.player)
+	position := component.Position(ctx)
 
 	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
 		cursorX, cursorY := ebiten.CursorPosition()
@@ -81,10 +85,9 @@ func (s *fireWeaponSystem) Update(_ gohan.Entity) error {
 	case ebiten.IsKeyPressed(ebiten.KeyDown):
 		s.fire(weapon, position, -math.Pi/2)
 	}
-
 	return nil
 }
 
-func (_ *fireWeaponSystem) Draw(_ gohan.Entity, _ *ebiten.Image) error {
+func (_ *fireWeaponSystem) Draw(_ *gohan.Context, _ *ebiten.Image) error {
 	return gohan.ErrSystemWithoutDraw
 }

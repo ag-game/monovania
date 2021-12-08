@@ -5,10 +5,10 @@ import (
 	"image/color"
 	"time"
 
-	"code.rocketnine.space/tslocum/monovania/world"
-
 	"code.rocketnine.space/tslocum/gohan"
 	"code.rocketnine.space/tslocum/monovania/component"
+	"code.rocketnine.space/tslocum/monovania/engine"
+	"code.rocketnine.space/tslocum/monovania/world"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -99,17 +99,17 @@ func NewMovementSystem() *MovementSystem {
 }
 
 func drawDebugRect(r image.Rectangle, c color.Color) gohan.Entity {
-	rectEntity := gohan.NewEntity()
+	rectEntity := engine.Engine.NewEntity()
 
 	rectImg := ebiten.NewImage(r.Dx(), r.Dy())
 	rectImg.Fill(c)
 
-	rectEntity.AddComponent(&component.PositionComponent{
+	engine.Engine.AddComponent(rectEntity, &component.PositionComponent{
 		X: float64(r.Min.X),
 		Y: float64(r.Min.Y),
 	})
 
-	rectEntity.AddComponent(&component.SpriteComponent{
+	engine.Engine.AddComponent(rectEntity, &component.SpriteComponent{
 		Image:              rectImg,
 		OverrideColorScale: true,
 	})
@@ -119,12 +119,12 @@ func drawDebugRect(r image.Rectangle, c color.Color) gohan.Entity {
 
 func (s *MovementSystem) removeDebugRects() {
 	for _, e := range s.debugCollisionRects {
-		e.Remove()
+		engine.Engine.RemoveEntity(e)
 	}
 	s.debugCollisionRects = nil
 
 	for _, e := range s.debugLadderRects {
-		e.Remove()
+		engine.Engine.RemoveEntity(e)
 	}
 	s.debugLadderRects = nil
 }
@@ -154,7 +154,7 @@ func (s *MovementSystem) UpdateDebugCollisionRects() {
 	}
 
 	for i, debugRect := range s.debugCollisionRects {
-		sprite := component.Sprite(debugRect)
+		sprite := engine.Engine.Component(debugRect, component.SpriteComponentID).(*component.SpriteComponent)
 		if s.OnGround == i {
 			sprite.ColorScale = 1
 		} else {
@@ -163,7 +163,7 @@ func (s *MovementSystem) UpdateDebugCollisionRects() {
 	}
 
 	for i, debugRect := range s.debugLadderRects {
-		sprite := component.Sprite(debugRect)
+		sprite := engine.Engine.Component(debugRect, component.SpriteComponentID).(*component.SpriteComponent)
 		if s.OnLadder == i {
 			sprite.ColorScale = 1
 		} else {
@@ -176,11 +176,15 @@ func (s *MovementSystem) objectToGameCoords(x, y, height float64) (float64, floa
 	return x, float64(world.World.Map.Height*16) - y - height
 }
 
-func (_ *MovementSystem) Matches(entity gohan.Entity) bool {
-	position := entity.Component(component.PositionComponentID)
-	velocity := entity.Component(component.VelocityComponentID)
+func (_ *MovementSystem) Needs() []gohan.ComponentID {
+	return []gohan.ComponentID{
+		component.PositionComponentID,
+		component.VelocityComponentID,
+	}
+}
 
-	return position != nil && velocity != nil
+func (_ *MovementSystem) Uses() []gohan.ComponentID {
+	return nil
 }
 
 func (s *MovementSystem) checkFire(r image.Rectangle) {
@@ -188,8 +192,8 @@ func (s *MovementSystem) checkFire(r image.Rectangle) {
 		if r.Overlaps(fireRect) {
 			//world.World.GameOver = true
 			// TODO
-			position := component.Position(world.World.Player)
-			velocity := component.Velocity(world.World.Player)
+			position := engine.Engine.Component(world.World.Player, component.PositionComponentID).(*component.PositionComponent)
+			velocity := engine.Engine.Component(world.World.Player, component.VelocityComponentID).(*component.VelocityComponent)
 			position.X, position.Y = world.World.SpawnX, world.World.SpawnY
 			velocity.X, velocity.Y = 0, 0
 			return
@@ -207,7 +211,7 @@ func (s *MovementSystem) checkTriggers(r image.Rectangle) {
 			}
 
 			// Remove trigger.
-			world.World.TriggerEntities[i].Remove()
+			engine.Engine.RemoveEntity(world.World.TriggerEntities[i])
 
 			world.World.TriggerRects = append(world.World.TriggerRects[:i], world.World.TriggerRects[i+1:]...)
 			world.World.TriggerEntities = append(world.World.TriggerEntities[:i], world.World.TriggerEntities[i+1:]...)
@@ -222,13 +226,14 @@ func (s *MovementSystem) checkCollisions(r image.Rectangle) {
 	s.checkTriggers(r)
 }
 
-func (s *MovementSystem) Update(entity gohan.Entity) error {
+func (s *MovementSystem) Update(ctx *gohan.Context) error {
 	lastOnGround := s.OnGround
 	lastOnLadder := s.OnLadder
 
-	position := component.Position(entity)
-	velocity := component.Velocity(entity)
-	bullet := component.Bullet(entity)
+	position := component.Position(ctx)
+	velocity := component.Velocity(ctx)
+
+	bullet := ctx.Entity != world.World.Player
 
 	onLadder := -1
 	playerRect := image.Rect(int(position.X), int(position.Y), int(position.X)+16, int(position.Y)+16)
@@ -237,7 +242,7 @@ func (s *MovementSystem) Update(entity gohan.Entity) error {
 			onLadder = i
 
 			// Grab the ladder when jumping on to it.
-			if onLadder != lastOnLadder {
+			if onLadder != lastOnLadder && !world.World.NoClip {
 				velocity.Y = 0
 				//velocity.X /= 2
 			}
@@ -252,11 +257,11 @@ func (s *MovementSystem) Update(entity gohan.Entity) error {
 	const ladderDecel = 0.9
 	const maxGravity = 9
 	const gravityAccel = 0.04
-	if bullet == nil {
-		if s.OnLadder != -1 || world.World.NoClip {
+	if !bullet {
+		if s.OnLadder != -1 || world.World.Levitating || world.World.NoClip {
 			velocity.X *= decel
 			velocity.Y *= decel
-		} else if s.OnLadder != -1 {
+		} else if s.OnLadder != -1 { // TODO incorrect
 			velocity.X *= decel
 			velocity.Y *= ladderDecel
 		} else if velocity.Y < maxGravity {
@@ -268,6 +273,11 @@ func (s *MovementSystem) Update(entity gohan.Entity) error {
 		}
 	}
 
+	vx, vy := velocity.X, velocity.Y
+	if world.World.Debug > 0 && ebiten.IsKeyPressed(ebiten.KeyShift) {
+		vx, vy = vx*2, vy*2
+	}
+
 	// Check collisions.
 
 	var (
@@ -276,11 +286,11 @@ func (s *MovementSystem) Update(entity gohan.Entity) error {
 		collideXY = -1
 		collideG  = -1
 	)
-	const threshold = 0.1
-	playerRectX := image.Rect(int(position.X+velocity.X), int(position.Y), int(position.X+velocity.X)+16, int(position.Y)+17)
-	playerRectY := image.Rect(int(position.X), int(position.Y+velocity.Y), int(position.X)+16, int(position.Y+velocity.Y)+17)
-	playerRectXY := image.Rect(int(position.X+velocity.X), int(position.Y+velocity.Y), int(position.X+velocity.X)+16, int(position.Y+velocity.Y)+17)
-	playerRectG := image.Rect(int(position.X), int(position.Y+threshold), int(position.X)+16, int(position.Y+threshold)+17)
+	const gravityThreshold = 4
+	playerRectX := image.Rect(int(position.X+vx), int(position.Y), int(position.X+vx)+16, int(position.Y)+17)
+	playerRectY := image.Rect(int(position.X), int(position.Y+vy), int(position.X)+16, int(position.Y+vy)+17)
+	playerRectXY := image.Rect(int(position.X+vx), int(position.Y+vy), int(position.X+vx)+16, int(position.Y+vy)+17)
+	playerRectG := image.Rect(int(position.X), int(position.Y+gravityThreshold), int(position.X)+16, int(position.Y+gravityThreshold)+17)
 	for i, rect := range s.collisionRects {
 		if world.World.NoClip {
 			continue
@@ -303,12 +313,12 @@ func (s *MovementSystem) Update(entity gohan.Entity) error {
 		}
 	}
 	if collideXY == -1 {
-		position.X, position.Y = position.X+velocity.X, position.Y+velocity.Y
+		position.X, position.Y = position.X+vx, position.Y+vy
 	} else if collideX == -1 {
-		position.X = position.X + velocity.X
+		position.X = position.X + vx
 		velocity.Y = 0
 	} else if collideY == -1 {
-		position.Y = position.Y + velocity.Y
+		position.Y = position.Y + vy
 		velocity.X = 0
 	} else {
 		velocity.X, velocity.Y = 0, 0
@@ -328,6 +338,6 @@ func (s *MovementSystem) Update(entity gohan.Entity) error {
 	return nil
 }
 
-func (_ *MovementSystem) Draw(entity gohan.Entity, screen *ebiten.Image) error {
+func (_ *MovementSystem) Draw(_ *gohan.Context, screen *ebiten.Image) error {
 	return gohan.ErrSystemWithoutDraw
 }

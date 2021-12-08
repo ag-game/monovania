@@ -9,9 +9,10 @@ import (
 	"path/filepath"
 	"time"
 
-	"code.rocketnine.space/tslocum/monovania/asset"
+	"code.rocketnine.space/tslocum/monovania/engine"
 
 	"code.rocketnine.space/tslocum/gohan"
+	"code.rocketnine.space/tslocum/monovania/asset"
 	"code.rocketnine.space/tslocum/monovania/component"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/lafriks/go-tiled"
@@ -41,8 +42,10 @@ type GameWorld struct {
 
 	// Abilities
 	CanDoubleJump bool
+	CanLevitate   bool
 
-	Jumps int
+	Jumps      int
+	Levitating bool
 
 	TriggerRects    []image.Rectangle
 	TriggerEntities []gohan.Entity
@@ -100,12 +103,12 @@ func LoadMap(filePath string) {
 	createTileEntity := func(t *tiled.LayerTile, x int, y int) gohan.Entity {
 		tileX, tileY := TileToGameCoords(x, y)
 
-		mapTile := gohan.NewEntity()
-		mapTile.AddComponent(&component.PositionComponent{
+		mapTile := engine.Engine.NewEntity()
+		engine.Engine.AddComponent(mapTile, &component.PositionComponent{
 			X: tileX,
 			Y: tileY,
 		})
-		mapTile.AddComponent(&component.SpriteComponent{
+		engine.Engine.AddComponent(mapTile, &component.SpriteComponent{
 			Image:          tileCache[t.Tileset.FirstGID+t.ID],
 			HorizontalFlip: t.HorizontalFlip,
 			VerticalFlip:   t.VerticalFlip,
@@ -190,12 +193,12 @@ func LoadMap(filePath string) {
 					continue
 				}
 
-				mapTile := gohan.NewEntity()
-				mapTile.AddComponent(&component.PositionComponent{
+				mapTile := engine.Engine.NewEntity()
+				engine.Engine.AddComponent(mapTile, &component.PositionComponent{
 					X: obj.X,
 					Y: obj.Y - 16,
 				})
-				mapTile.AddComponent(&component.SpriteComponent{
+				engine.Engine.AddComponent(mapTile, &component.SpriteComponent{
 					Image: tileCache[obj.GID],
 				})
 

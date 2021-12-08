@@ -3,13 +3,10 @@ package system
 import (
 	_ "image/png"
 
-	"code.rocketnine.space/tslocum/monovania/component"
-
-	"code.rocketnine.space/tslocum/monovania/asset"
-
-	"code.rocketnine.space/tslocum/monovania/world"
-
 	"code.rocketnine.space/tslocum/gohan"
+	"code.rocketnine.space/tslocum/monovania/asset"
+	"code.rocketnine.space/tslocum/monovania/component"
+	"code.rocketnine.space/tslocum/monovania/world"
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
@@ -25,20 +22,27 @@ func NewRenderBackgroundSystem() *RenderBackgroundSystem {
 	return s
 }
 
-func (s *RenderBackgroundSystem) Matches(entity gohan.Entity) bool {
-	return entity == world.World.Player
+func (s *RenderBackgroundSystem) Needs() []gohan.ComponentID {
+	return []gohan.ComponentID{
+		component.PositionComponentID,
+		component.WeaponComponentID,
+	}
 }
 
-func (s *RenderBackgroundSystem) Update(_ gohan.Entity) error {
+func (s *RenderBackgroundSystem) Uses() []gohan.ComponentID {
+	return nil
+}
+
+func (s *RenderBackgroundSystem) Update(_ *gohan.Context) error {
 	return gohan.ErrSystemWithoutUpdate
 }
 
-func (s *RenderBackgroundSystem) Draw(entity gohan.Entity, screen *ebiten.Image) error {
+func (s *RenderBackgroundSystem) Draw(ctx *gohan.Context, screen *ebiten.Image) error {
 	if world.World.GameOver {
 		return nil
 	}
 
-	position := component.Position(world.World.Player)
+	position := component.Position(ctx)
 
 	pctX, pctY := position.X/(512*16), position.Y/(512*16)
 

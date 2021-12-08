@@ -4,26 +4,27 @@ import (
 	"code.rocketnine.space/tslocum/gohan"
 	"code.rocketnine.space/tslocum/monovania/asset"
 	"code.rocketnine.space/tslocum/monovania/component"
+	"code.rocketnine.space/tslocum/monovania/engine"
 )
 
 func NewBullet(x, y, xSpeed, ySpeed float64) gohan.Entity {
-	bullet := gohan.NewEntity()
+	bullet := engine.Engine.NewEntity()
 
-	bullet.AddComponent(&component.PositionComponent{
+	engine.Engine.AddComponent(bullet, &component.PositionComponent{
 		X: x,
 		Y: y,
 	})
 
-	bullet.AddComponent(&component.VelocityComponent{
+	engine.Engine.AddComponent(bullet, &component.VelocityComponent{
 		X: xSpeed,
 		Y: ySpeed,
 	})
 
-	bullet.AddComponent(&component.SpriteComponent{
+	engine.Engine.AddComponent(bullet, &component.SpriteComponent{
 		Image: asset.ImgWhiteSquare,
 	})
 
-	bullet.AddComponent(&component.BulletComponent{})
+	engine.Engine.AddComponent(bullet, &component.BulletComponent{})
 
 	return bullet
 }

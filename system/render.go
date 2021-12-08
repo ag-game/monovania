@@ -4,13 +4,12 @@ import (
 	_ "image/png"
 	"time"
 
-	"golang.org/x/image/colornames"
-
-	"code.rocketnine.space/tslocum/monovania/world"
-
 	"code.rocketnine.space/tslocum/gohan"
 	"code.rocketnine.space/tslocum/monovania/component"
+	"code.rocketnine.space/tslocum/monovania/engine"
+	"code.rocketnine.space/tslocum/monovania/world"
 	"github.com/hajimehoshi/ebiten/v2"
+	"golang.org/x/image/colornames"
 )
 
 const TileWidth = 16
@@ -31,7 +30,7 @@ type RenderSystem struct {
 
 func NewRenderSystem() *RenderSystem {
 	s := &RenderSystem{
-		renderer: gohan.NewEntity(),
+		renderer: engine.Engine.NewEntity(),
 		op:       &ebiten.DrawImageOptions{},
 		camScale: 4,
 	}
@@ -39,14 +38,18 @@ func NewRenderSystem() *RenderSystem {
 	return s
 }
 
-func (s *RenderSystem) Matches(entity gohan.Entity) bool {
-	position := component.Position(entity)
-	sprite := component.Sprite(entity)
-
-	return position != nil && sprite != nil
+func (s *RenderSystem) Needs() []gohan.ComponentID {
+	return []gohan.ComponentID{
+		component.PositionComponentID,
+		component.SpriteComponentID,
+	}
 }
 
-func (s *RenderSystem) Update(_ gohan.Entity) error {
+func (s *RenderSystem) Uses() []gohan.ComponentID {
+	return nil
+}
+
+func (s *RenderSystem) Update(_ *gohan.Context) error {
 	return gohan.ErrSystemWithoutUpdate
 }
 
@@ -112,16 +115,16 @@ func (s *RenderSystem) renderSprite(x float64, y float64, offsetx float64, offse
 	return 1
 }
 
-func (s *RenderSystem) Draw(entity gohan.Entity, screen *ebiten.Image) error {
+func (s *RenderSystem) Draw(ctx *gohan.Context, screen *ebiten.Image) error {
 	if world.World.GameOver {
-		if entity == world.World.Player {
+		if ctx.Entity == world.World.Player {
 			screen.Fill(colornames.Darkred)
 		}
 		return nil
 	}
 
-	position := component.Position(entity)
-	sprite := component.Sprite(entity)
+	position := component.Position(ctx)
+	sprite := component.Sprite(ctx)
 
 	if sprite.NumFrames > 0 && time.Since(sprite.LastFrame) > sprite.FrameTime {
 		sprite.Frame++

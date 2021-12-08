@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"code.rocketnine.space/tslocum/gohan"
+	"code.rocketnine.space/tslocum/monovania/engine"
 )
 
 type WeaponComponent struct {
@@ -17,14 +18,14 @@ type WeaponComponent struct {
 	BulletSpeed float64
 }
 
-var WeaponComponentID = gohan.NewComponentID()
+var WeaponComponentID = engine.Engine.NewComponentID()
 
 func (p *WeaponComponent) ComponentID() gohan.ComponentID {
 	return WeaponComponentID
 }
 
-func Weapon(e gohan.Entity) *WeaponComponent {
-	c, ok := e.Component(WeaponComponentID).(*WeaponComponent)
+func Weapon(ctx *gohan.Context) *WeaponComponent {
+	c, ok := ctx.Component(WeaponComponentID).(*WeaponComponent)
 	if !ok {
 		return nil
 	}

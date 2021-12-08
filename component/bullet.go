@@ -2,19 +2,20 @@ package component
 
 import (
 	"code.rocketnine.space/tslocum/gohan"
+	"code.rocketnine.space/tslocum/monovania/engine"
 )
 
 type BulletComponent struct {
 }
 
-var BulletComponentID = gohan.NewComponentID()
+var BulletComponentID = engine.Engine.NewComponentID()
 
 func (p *BulletComponent) ComponentID() gohan.ComponentID {
 	return BulletComponentID
 }
 
-func Bullet(e gohan.Entity) *BulletComponent {
-	c, ok := e.Component(BulletComponentID).(*BulletComponent)
+func Bullet(ctx *gohan.Context) *BulletComponent {
+	c, ok := ctx.Component(BulletComponentID).(*BulletComponent)
 	if !ok {
 		return nil
 	}

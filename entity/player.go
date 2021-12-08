@@ -3,21 +3,21 @@ package entity
 import (
 	"time"
 
-	"code.rocketnine.space/tslocum/monovania/asset"
-
 	"code.rocketnine.space/tslocum/gohan"
+	"code.rocketnine.space/tslocum/monovania/asset"
 	"code.rocketnine.space/tslocum/monovania/component"
+	"code.rocketnine.space/tslocum/monovania/engine"
 )
 
 func NewPlayer(x, y float64) gohan.Entity {
-	player := gohan.NewEntity()
+	player := engine.Engine.NewEntity()
 
-	player.AddComponent(&component.PositionComponent{
+	engine.Engine.AddComponent(player, &component.PositionComponent{
 		X: x,
 		Y: y,
 	})
 
-	player.AddComponent(&component.VelocityComponent{})
+	engine.Engine.AddComponent(player, &component.VelocityComponent{})
 
 	weapon := &component.WeaponComponent{
 		Ammo:        1000,
@@ -25,9 +25,9 @@ func NewPlayer(x, y float64) gohan.Entity {
 		FireRate:    100 * time.Millisecond,
 		BulletSpeed: 15,
 	}
-	player.AddComponent(weapon)
+	engine.Engine.AddComponent(player, weapon)
 
-	player.AddComponent(&component.SpriteComponent{
+	engine.Engine.AddComponent(player, &component.SpriteComponent{
 		Image: asset.PlayerSS.IdleR,
 	})
 

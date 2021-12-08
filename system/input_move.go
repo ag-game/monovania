@@ -3,17 +3,13 @@ package system
 import (
 	"time"
 
-	"github.com/fogleman/ease"
-
-	"code.rocketnine.space/tslocum/monovania/asset"
-
-	"code.rocketnine.space/tslocum/monovania/world"
-
-	"github.com/hajimehoshi/ebiten/v2/inpututil"
-
 	"code.rocketnine.space/tslocum/gohan"
+	"code.rocketnine.space/tslocum/monovania/asset"
 	"code.rocketnine.space/tslocum/monovania/component"
+	"code.rocketnine.space/tslocum/monovania/world"
+	"github.com/fogleman/ease"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
 
 type playerMoveSystem struct {
@@ -29,11 +25,19 @@ func NewPlayerMoveSystem(player gohan.Entity, m *MovementSystem) *playerMoveSyst
 	}
 }
 
-func (s *playerMoveSystem) Matches(e gohan.Entity) bool {
-	return e == s.player
+func (_ *playerMoveSystem) Needs() []gohan.ComponentID {
+	return []gohan.ComponentID{
+		component.VelocityComponentID,
+		component.WeaponComponentID,
+		component.SpriteComponentID,
+	}
 }
 
-func (s *playerMoveSystem) Update(e gohan.Entity) error {
+func (_ *playerMoveSystem) Uses() []gohan.ComponentID {
+	return nil
+}
+
+func (s *playerMoveSystem) Update(ctx *gohan.Context) error {
 	if ebiten.IsKeyPressed(ebiten.KeyControl) && inpututil.IsKeyJustPressed(ebiten.KeyV) {
 		world.World.Debug++
 		if world.World.Debug > 2 {
@@ -49,20 +53,22 @@ func (s *playerMoveSystem) Update(e gohan.Entity) error {
 
 	moveSpeed := 0.1
 	maxSpeed := 0.5
+	maxLevitateSpeed := 1.0
 	maxYSpeed := 0.5
 	const jumpVelocity = -1
 
-	if world.World.Debug > 0 && ebiten.IsKeyPressed(ebiten.KeyShift) {
-		maxSpeed *= 10
-		maxYSpeed = 40
-	}
+	velocity := component.Velocity(ctx)
 
 	var walkKeyPressed bool
 
-	velocity := component.Velocity(s.player)
 	if s.movement.OnGround != -1 && ebiten.IsKeyPressed(ebiten.KeyS) && !world.World.NoClip {
+		if ebiten.IsKeyPressed(ebiten.KeyA) {
+			s.lastWalkDirL = true
+		} else if ebiten.IsKeyPressed(ebiten.KeyD) {
+			s.lastWalkDirL = false
+		}
 		// Duck and look down.
-		sprite := component.Sprite(s.player)
+		sprite := component.Sprite(ctx)
 		sprite.NumFrames = 0
 		if s.lastWalkDirL {
 			sprite.Image = asset.PlayerSS.DuckL
@@ -114,7 +120,7 @@ func (s *playerMoveSystem) Update(e gohan.Entity) error {
 		}
 
 		if ebiten.IsKeyPressed(ebiten.KeyA) {
-			if velocity.X > -maxSpeed {
+			if velocity.X > -maxSpeed || world.World.NoClip {
 				if s.movement.OnLadder != -1 {
 					velocity.X -= moveSpeed / 2
 				} else {
@@ -122,21 +128,23 @@ func (s *playerMoveSystem) Update(e gohan.Entity) error {
 				}
 			}
 
-			sprite := component.Sprite(s.player)
-			sprite.Frames = []*ebiten.Image{
-				asset.PlayerSS.WalkL1,
-				asset.PlayerSS.IdleL,
-				asset.PlayerSS.WalkL2,
-				asset.PlayerSS.IdleL,
+			if !world.World.NoClip {
+				sprite := component.Sprite(ctx)
+				sprite.Frames = []*ebiten.Image{
+					asset.PlayerSS.WalkL1,
+					asset.PlayerSS.IdleL,
+					asset.PlayerSS.WalkL2,
+					asset.PlayerSS.IdleL,
+				}
+				sprite.NumFrames = 4
+				sprite.FrameTime = 150 * time.Millisecond
 			}
-			sprite.NumFrames = 4
-			sprite.FrameTime = 150 * time.Millisecond
 
 			walkKeyPressed = true
 			s.lastWalkDirL = true
 		}
 		if ebiten.IsKeyPressed(ebiten.KeyD) {
-			if velocity.X < maxSpeed {
+			if velocity.X < maxSpeed || world.World.NoClip {
 				if s.movement.OnLadder != -1 {
 					velocity.X += moveSpeed / 2
 				} else {
@@ -144,15 +152,17 @@ func (s *playerMoveSystem) Update(e gohan.Entity) error {
 				}
 			}
 
-			sprite := component.Sprite(s.player)
-			sprite.Frames = []*ebiten.Image{
-				asset.PlayerSS.WalkR1,
-				asset.PlayerSS.IdleR,
-				asset.PlayerSS.WalkR2,
-				asset.PlayerSS.IdleR,
+			if !world.World.NoClip {
+				sprite := component.Sprite(ctx)
+				sprite.Frames = []*ebiten.Image{
+					asset.PlayerSS.WalkR1,
+					asset.PlayerSS.IdleR,
+					asset.PlayerSS.WalkR2,
+					asset.PlayerSS.IdleR,
+				}
+				sprite.NumFrames = 4
+				sprite.FrameTime = 150 * time.Millisecond
 			}
-			sprite.NumFrames = 4
-			sprite.FrameTime = 150 * time.Millisecond
 
 			walkKeyPressed = true
 			s.lastWalkDirL = false
@@ -160,7 +170,10 @@ func (s *playerMoveSystem) Update(e gohan.Entity) error {
 	}
 	if s.movement.OnLadder != -1 || world.World.NoClip {
 		setLadderFrames := func() {
-			sprite := component.Sprite(s.player)
+			if world.World.NoClip {
+				return
+			}
+			sprite := component.Sprite(ctx)
 			if s.lastWalkDirL {
 				sprite.Frames = []*ebiten.Image{
 					asset.PlayerSS.WalkL1,
@@ -180,7 +193,7 @@ func (s *playerMoveSystem) Update(e gohan.Entity) error {
 			sprite.FrameTime = 150 * time.Millisecond
 		}
 		if ebiten.IsKeyPressed(ebiten.KeyW) {
-			if velocity.Y > -maxYSpeed {
+			if velocity.Y > -maxYSpeed || world.World.NoClip {
 				velocity.Y -= moveSpeed
 			}
 
@@ -188,7 +201,7 @@ func (s *playerMoveSystem) Update(e gohan.Entity) error {
 			walkKeyPressed = true
 		}
 		if ebiten.IsKeyPressed(ebiten.KeyS) && s.movement.OnGround == -1 {
-			if velocity.Y < maxYSpeed {
+			if velocity.Y < maxYSpeed || world.World.NoClip {
 				velocity.Y += moveSpeed
 			}
 
@@ -204,9 +217,11 @@ func (s *playerMoveSystem) Update(e gohan.Entity) error {
 				s.movement.LastJump = time.Now()
 				world.World.Jumps++
 				// Allow one double jump when falling.
-				if s.movement.OnGround == -1 {
-					world.World.Jumps++
+				if world.World.Jumps == 1 && s.movement.OnGround == -1 {
+					world.World.Jumps = 2
 				}
+			} else if world.World.CanLevitate && world.World.Jumps == 2 {
+				world.World.Levitating = true
 			}
 		}
 
@@ -215,17 +230,27 @@ func (s *playerMoveSystem) Update(e gohan.Entity) error {
 		}
 	}
 
-	if !walkKeyPressed || (s.movement.OnGround == -1 && s.movement.OnLadder == -1) {
-		sprite := component.Sprite(s.player)
+	if world.World.Levitating {
+		if ebiten.IsKeyPressed(ebiten.KeyW) {
+			if velocity.Y > -maxLevitateSpeed {
+				velocity.Y -= moveSpeed
+			}
+		} else {
+			world.World.Levitating = false
+		}
+	}
+
+	if !walkKeyPressed || (s.movement.OnGround == -1 && s.movement.OnLadder == -1) || world.World.NoClip {
+		sprite := component.Sprite(ctx)
 		sprite.NumFrames = 0
 		if s.lastWalkDirL {
-			if s.movement.OnGround == -1 && s.movement.OnLadder == -1 {
+			if (s.movement.OnGround == -1 && s.movement.OnLadder == -1) || world.World.NoClip {
 				sprite.Image = asset.PlayerSS.WalkL2
 			} else {
 				sprite.Image = asset.PlayerSS.IdleL
 			}
 		} else {
-			if s.movement.OnGround == -1 && s.movement.OnLadder == -1 {
+			if (s.movement.OnGround == -1 && s.movement.OnLadder == -1) || world.World.NoClip {
 				sprite.Image = asset.PlayerSS.WalkR2
 			} else {
 				sprite.Image = asset.PlayerSS.IdleR
@@ -236,6 +261,6 @@ func (s *playerMoveSystem) Update(e gohan.Entity) error {
 	return nil
 }
 
-func (s *playerMoveSystem) Draw(_ gohan.Entity, _ *ebiten.Image) error {
+func (s *playerMoveSystem) Draw(_ *gohan.Context, _ *ebiten.Image) error {
 	return gohan.ErrSystemWithoutDraw
 }

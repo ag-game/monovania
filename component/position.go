@@ -2,20 +2,21 @@ package component
 
 import (
 	"code.rocketnine.space/tslocum/gohan"
+	"code.rocketnine.space/tslocum/monovania/engine"
 )
 
 type PositionComponent struct {
 	X, Y float64
 }
 
-var PositionComponentID = gohan.NewComponentID()
+var PositionComponentID = engine.Engine.NewComponentID()
 
 func (p *PositionComponent) ComponentID() gohan.ComponentID {
 	return PositionComponentID
 }
 
-func Position(e gohan.Entity) *PositionComponent {
-	c, ok := e.Component(PositionComponentID).(*PositionComponent)
+func Position(ctx *gohan.Context) *PositionComponent {
+	c, ok := ctx.Component(PositionComponentID).(*PositionComponent)
 	if !ok {
 		return nil
 	}

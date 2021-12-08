@@ -8,6 +8,7 @@ import (
 	"runtime/pprof"
 
 	"code.rocketnine.space/tslocum/gohan"
+	"code.rocketnine.space/tslocum/monovania/component"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/inpututil"
 )
@@ -23,11 +24,17 @@ func NewProfileSystem(player gohan.Entity) *profileSystem {
 	}
 }
 
-func (s *profileSystem) Matches(e gohan.Entity) bool {
-	return e == s.player
+func (s *profileSystem) Needs() []gohan.ComponentID {
+	return []gohan.ComponentID{
+		component.WeaponComponentID,
+	}
 }
 
-func (s *profileSystem) Update(e gohan.Entity) error {
+func (s *profileSystem) Uses() []gohan.ComponentID {
+	return nil
+}
+
+func (s *profileSystem) Update(_ *gohan.Context) error {
 	if ebiten.IsKeyPressed(ebiten.KeyControl) && inpututil.IsKeyJustPressed(ebiten.KeyP) {
 		if s.cpuProfile == nil {
 			log.Println("CPU profiling started...")
@@ -60,6 +67,6 @@ func (s *profileSystem) Update(e gohan.Entity) error {
 	return nil
 }
 
-func (s *profileSystem) Draw(_ gohan.Entity, _ *ebiten.Image) error {
+func (s *profileSystem) Draw(_ *gohan.Context, _ *ebiten.Image) error {
 	return gohan.ErrSystemWithoutDraw
 }

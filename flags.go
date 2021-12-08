@@ -11,18 +11,16 @@ import (
 )
 
 func parseFlags() {
-	var fullscreen bool
-	var doublejump bool
+	var (
+		fullscreen bool
+	)
 	flag.BoolVar(&fullscreen, "fullscreen", false, "run in fullscreen mode")
-	flag.BoolVar(&doublejump, "doublejump", false, "start with double jump ability")
+	flag.BoolVar(&world.World.CanDoubleJump, "doublejump", false, "start with double jump ability")
+	flag.BoolVar(&world.World.CanLevitate, "levitate", false, "start with levitate ability")
 	flag.IntVar(&world.World.Debug, "debug", 0, "print debug information")
 	flag.Parse()
 
 	if fullscreen {
 		ebiten.SetFullscreen(true)
-	}
-
-	if doublejump {
-		world.World.CanDoubleJump = true
 	}
 }

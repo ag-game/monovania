@@ -7,6 +7,8 @@ import (
 	"os"
 	"sync"
 
+	"code.rocketnine.space/tslocum/monovania/engine"
+
 	"code.rocketnine.space/tslocum/monovania/world"
 
 	"code.rocketnine.space/tslocum/monovania/component"
@@ -127,41 +129,43 @@ func (g *game) Update() error {
 		return nil
 	}
 
-	err := gohan.Update()
+	err := engine.Engine.Update()
 	if err != nil {
 		return err
 	}
 
 	// Update camera position.
-	position := component.Position(g.player)
+	position := engine.Engine.Component(g.player, component.PositionComponentID).(*component.PositionComponent)
 	system.CamX, system.CamY = position.X, position.Y
 	return nil
 }
 
 func (g *game) Draw(screen *ebiten.Image) {
-	err := gohan.Draw(screen)
+	err := engine.Engine.Draw(screen)
 	if err != nil {
 		panic(err)
 	}
 }
 
 func (g *game) addSystems() {
+	ecs := engine.Engine
+
 	g.movementSystem = system.NewMovementSystem() // TODO move into component
 
-	gohan.AddSystem(system.NewPlayerMoveSystem(g.player, g.movementSystem))
+	ecs.AddSystem(system.NewPlayerMoveSystem(g.player, g.movementSystem))
 
-	gohan.AddSystem(g.movementSystem)
+	ecs.AddSystem(g.movementSystem)
 
-	gohan.AddSystem(system.NewFireWeaponSystem(g.player))
+	ecs.AddSystem(system.NewFireWeaponSystem(g.player))
 
-	gohan.AddSystem(system.NewRenderBackgroundSystem())
+	ecs.AddSystem(system.NewRenderBackgroundSystem())
 
 	g.renderSystem = system.NewRenderSystem()
-	gohan.AddSystem(g.renderSystem)
+	ecs.AddSystem(g.renderSystem)
 
-	gohan.AddSystem(system.NewRenderDebugTextSystem(g.player))
+	ecs.AddSystem(system.NewRenderDebugTextSystem(g.player))
 
-	gohan.AddSystem(system.NewProfileSystem(g.player))
+	ecs.AddSystem(system.NewProfileSystem(g.player))
 }
 
 func (g *game) loadAssets() error {
@@ -169,7 +173,7 @@ func (g *game) loadAssets() error {
 }
 
 func (g *game) WarpTo(x, y float64) {
-	position := component.Position(world.World.Player)
+	position := engine.Engine.Component(g.player, component.PositionComponentID).(*component.PositionComponent)
 	position.X, position.Y = x, y
 	log.Printf("Warped to %.2f,%.2f", x, y)
 }
