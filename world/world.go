@@ -18,6 +18,13 @@ import (
 	"github.com/lafriks/go-tiled"
 )
 
+// Fire tile IDs.
+const (
+	FireTileA = 13
+	FireTileB = 14
+	FireTileC = 15
+)
+
 var World = &GameWorld{
 	StartedAt: time.Now(),
 	DuckStart: -1,
@@ -108,12 +115,53 @@ func LoadMap(filePath string) {
 			X: tileX,
 			Y: tileY,
 		})
-		engine.Engine.AddComponent(mapTile, &component.SpriteComponent{
+
+		sprite := &component.SpriteComponent{
 			Image:          tileCache[t.Tileset.FirstGID+t.ID],
 			HorizontalFlip: t.HorizontalFlip,
 			VerticalFlip:   t.VerticalFlip,
 			DiagonalFlip:   t.DiagonalFlip,
-		})
+		}
+
+		// Animate fire tiles.
+		if t.ID == FireTileA || t.ID == FireTileB || t.ID == FireTileC {
+			switch t.ID {
+			case FireTileA:
+				sprite.Frames = []*ebiten.Image{
+					tileCache[t.Tileset.FirstGID+FireTileA],
+					tileCache[t.Tileset.FirstGID+FireTileB],
+					tileCache[t.Tileset.FirstGID+FireTileC],
+					tileCache[t.Tileset.FirstGID+FireTileA],
+					tileCache[t.Tileset.FirstGID+FireTileC],
+					tileCache[t.Tileset.FirstGID+FireTileA],
+					tileCache[t.Tileset.FirstGID+FireTileB],
+				}
+			case FireTileB:
+				sprite.Frames = []*ebiten.Image{
+					tileCache[t.Tileset.FirstGID+FireTileB],
+					tileCache[t.Tileset.FirstGID+FireTileA],
+					tileCache[t.Tileset.FirstGID+FireTileB],
+					tileCache[t.Tileset.FirstGID+FireTileC],
+					tileCache[t.Tileset.FirstGID+FireTileB],
+					tileCache[t.Tileset.FirstGID+FireTileA],
+					tileCache[t.Tileset.FirstGID+FireTileC],
+				}
+			case FireTileC:
+				sprite.Frames = []*ebiten.Image{
+					tileCache[t.Tileset.FirstGID+FireTileC],
+					tileCache[t.Tileset.FirstGID+FireTileA],
+					tileCache[t.Tileset.FirstGID+FireTileC],
+					tileCache[t.Tileset.FirstGID+FireTileB],
+					tileCache[t.Tileset.FirstGID+FireTileA],
+					tileCache[t.Tileset.FirstGID+FireTileC],
+					tileCache[t.Tileset.FirstGID+FireTileB],
+				}
+			}
+			sprite.NumFrames = len(sprite.Frames)
+			sprite.FrameTime = 150 * time.Millisecond
+		}
+
+		engine.Engine.AddComponent(mapTile, sprite)
 
 		return mapTile
 	}

@@ -29,6 +29,7 @@ type MovementSystem struct {
 
 	debugCollisionRects []gohan.Entity
 	debugLadderRects    []gohan.Entity
+	debugFireRects      []gohan.Entity
 }
 
 func NewMovementSystem() *MovementSystem {
@@ -54,6 +55,11 @@ func NewMovementSystem() *MovementSystem {
 				if t == nil || t.Nil {
 					continue // No tile at this position.
 				}
+
+				if t.ID == world.FireTileA || t.ID == world.FireTileB || t.ID == world.FireTileC {
+					continue // Fire collision rects are handled separately.
+				}
+
 				gx, gy := world.TileToGameCoords(x, y)
 				s.collisionRects = append(s.collisionRects, image.Rect(int(gx), int(gy), int(gx)+16, int(gy)+16))
 			}
@@ -89,6 +95,12 @@ func NewMovementSystem() *MovementSystem {
 
 		for _, obj := range layer.Objects {
 			rect := world.ObjectToRect(obj)
+
+			// Adjust dimensions.
+			rect.Min.X += 2
+			rect.Min.Y += 4
+			rect.Max.X -= 2
+
 			s.fireRects = append(s.fireRects, rect)
 		}
 	}
@@ -98,7 +110,7 @@ func NewMovementSystem() *MovementSystem {
 	return s
 }
 
-func drawDebugRect(r image.Rectangle, c color.Color) gohan.Entity {
+func drawDebugRect(r image.Rectangle, c color.Color, overrideColorScale bool) gohan.Entity {
 	rectEntity := engine.Engine.NewEntity()
 
 	rectImg := ebiten.NewImage(r.Dx(), r.Dy())
@@ -111,7 +123,7 @@ func drawDebugRect(r image.Rectangle, c color.Color) gohan.Entity {
 
 	engine.Engine.AddComponent(rectEntity, &component.SpriteComponent{
 		Image:              rectImg,
-		OverrideColorScale: true,
+		OverrideColorScale: overrideColorScale,
 	})
 
 	return rectEntity
@@ -127,6 +139,11 @@ func (s *MovementSystem) removeDebugRects() {
 		engine.Engine.RemoveEntity(e)
 	}
 	s.debugLadderRects = nil
+
+	for _, e := range s.debugFireRects {
+		engine.Engine.RemoveEntity(e)
+	}
+	s.debugFireRects = nil
 }
 
 func (s *MovementSystem) addDebugCollisionRects() {
@@ -134,14 +151,20 @@ func (s *MovementSystem) addDebugCollisionRects() {
 
 	for _, rect := range s.collisionRects {
 		c := color.RGBA{200, 200, 200, 150}
-		debugRect := drawDebugRect(rect, c)
+		debugRect := drawDebugRect(rect, c, true)
 		s.debugCollisionRects = append(s.debugCollisionRects, debugRect)
 	}
 
 	for _, rect := range s.ladderRects {
-		c := color.RGBA{200, 200, 200, 150}
-		debugRect := drawDebugRect(rect, c)
+		c := color.RGBA{0, 0, 200, 150}
+		debugRect := drawDebugRect(rect, c, true)
 		s.debugLadderRects = append(s.debugLadderRects, debugRect)
+	}
+
+	for _, rect := range s.fireRects {
+		c := color.RGBA{200, 0, 0, 150}
+		debugRect := drawDebugRect(rect, c, false)
+		s.debugFireRects = append(s.debugFireRects, debugRect)
 	}
 }
 
