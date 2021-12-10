@@ -76,15 +76,16 @@ type game struct {
 // NewGame returns a new isometric demo game.
 func NewGame() (*game, error) {
 	g := &game{
-		camScale: 4,
-		playerX:  7,
-		playerY:  14,
-		op:       &ebiten.DrawImageOptions{},
+		camScale:     4,
+		playerX:      7,
+		playerY:      14,
+		audioContext: audio.NewContext(sampleRate),
+		op:           &ebiten.DrawImageOptions{},
 	}
 
-	g.audioContext = audio.NewContext(sampleRate)
+	const numEntities = 30000
+	engine.Engine.Preallocate(numEntities)
 
-	// TODO replace with fs embed
 	g.changeMap("map/m1.tmx")
 
 	world.World.Player = entity.NewPlayer(world.World.SpawnX, world.World.SpawnY)

@@ -1,11 +1,13 @@
 package system
 
 import (
+	"log"
 	"time"
 
 	"code.rocketnine.space/tslocum/gohan"
 	"code.rocketnine.space/tslocum/monovania/asset"
 	"code.rocketnine.space/tslocum/monovania/component"
+	"code.rocketnine.space/tslocum/monovania/engine"
 	"code.rocketnine.space/tslocum/monovania/world"
 	"github.com/fogleman/ease"
 	"github.com/hajimehoshi/ebiten/v2"
@@ -48,6 +50,12 @@ func (s *playerMoveSystem) Update(ctx *gohan.Context) error {
 	}
 	if ebiten.IsKeyPressed(ebiten.KeyControl) && inpututil.IsKeyJustPressed(ebiten.KeyN) {
 		world.World.NoClip = !world.World.NoClip
+		return nil
+	}
+	if ebiten.IsKeyPressed(ebiten.KeyControl) && inpututil.IsKeyJustPressed(ebiten.KeyX) {
+		position := engine.Engine.Component(s.player, component.PositionComponentID).(*component.PositionComponent)
+		world.World.SpawnX, world.World.SpawnY = position.X, position.Y-12
+		log.Printf("Spawn point set to %.0f,%.0f", world.World.SpawnX, world.World.SpawnY)
 		return nil
 	}
 

@@ -55,7 +55,7 @@ func (s *RenderDebugTextSystem) Draw(ctx *gohan.Context, screen *ebiten.Image) e
 	s.debugImg.Clear()
 	s.op.GeoM.Reset()
 	s.op.GeoM.Scale(2, 2)
-	ebitenutil.DebugPrint(s.debugImg, fmt.Sprintf("POS  %.0f,%.0f\nVEL  %.2f,%.2f\nENT  %d\nUPD  %d\nDRA  %d\nTPS  %0.0f\nFPS  %0.0f", position.X, position.Y, velocity.X, velocity.Y, engine.Engine.ActiveEntities(), engine.Engine.UpdatedEntities(), engine.Engine.DrawnEntities(), ebiten.CurrentTPS(), ebiten.CurrentFPS()))
+	ebitenutil.DebugPrint(s.debugImg, fmt.Sprintf("POS  %.0f,%.0f\nVEL  %.2f,%.2f\nENT  %d\nUPD  %d\nDRA  %d\nTPS  %0.0f\nFPS  %0.0f", position.X, position.Y, velocity.X, velocity.Y, engine.Engine.CurrentEntities(), engine.Engine.CurrentUpdates(), engine.Engine.CurrentDraws(), ebiten.CurrentTPS(), ebiten.CurrentFPS()))
 	screen.DrawImage(s.debugImg, s.op)
 	return nil
 }

@@ -68,8 +68,7 @@ func (s *RenderSystem) renderSprite(x float64, y float64, offsetx float64, offse
 	// Skip drawing off-screen tiles.
 	drawX, drawY := s.levelCoordinatesToScreen(x, y)
 	padding := float64(TileWidth) * 2
-	w, h := sprite.Size()
-	width, height := float64(w), float64(h)
+	width, height := float64(TileWidth), float64(TileWidth)
 	left := drawX
 	right := drawX + width
 	top := drawY

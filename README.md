@@ -7,6 +7,10 @@ This game was created for the [Metroidvania Month 14 Game Jam](https://itch.io/j
 
 ## Play
 
+### Browser
+
+[**Play in your browser**](https://rocketnine.itch.io/monovania?secret=monovania)
+
 ### Compile
 
 **Note:** You will need to install the dependencies listed for [your platform](https://github.com/hajimehoshi/ebiten/blob/main/README.md#platforms).

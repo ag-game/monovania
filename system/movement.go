@@ -258,6 +258,8 @@ func (s *MovementSystem) Update(ctx *gohan.Context) error {
 
 	bullet := ctx.Entity != world.World.Player
 
+	// TODO apply left and right X collision adjustments (too large, can hang entirely off edge of cliff)
+
 	onLadder := -1
 	playerRect := image.Rect(int(position.X), int(position.Y), int(position.X)+16, int(position.Y)+16)
 	for i, rect := range s.ladderRects {
