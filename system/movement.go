@@ -21,6 +21,9 @@ type MovementSystem struct {
 	Jumping  bool
 	LastJump time.Time
 
+	Dashing  bool
+	LastDash time.Time
+
 	collisionRects []image.Rectangle
 
 	ladderRects []image.Rectangle
@@ -227,9 +230,12 @@ func (s *MovementSystem) checkFire(r image.Rectangle) {
 func (s *MovementSystem) checkTriggers(r image.Rectangle) {
 	for i, triggerRect := range world.World.TriggerRects {
 		if r.Overlaps(triggerRect) {
-			if world.World.TriggerNames[i] == "DOUBLEJUMP" {
+			switch world.World.TriggerNames[i] {
+			case "DOUBLEJUMP":
 				world.World.CanDoubleJump = true
-			} else {
+			case "DASH":
+				world.World.CanDash = true
+			default:
 				panic("unknown trigger " + world.World.TriggerNames[i])
 			}
 
@@ -265,12 +271,6 @@ func (s *MovementSystem) Update(ctx *gohan.Context) error {
 	for i, rect := range s.ladderRects {
 		if playerRect.Overlaps(rect) {
 			onLadder = i
-
-			// Grab the ladder when jumping on to it.
-			if onLadder != lastOnLadder && !world.World.NoClip {
-				velocity.Y = 0
-				//velocity.X /= 2
-			}
 			break
 		}
 	}
@@ -283,17 +283,19 @@ func (s *MovementSystem) Update(ctx *gohan.Context) error {
 	const maxGravity = 9
 	const gravityAccel = 0.04
 	if !bullet {
-		if s.OnLadder != -1 || world.World.Levitating || world.World.NoClip {
+		if world.World.Levitating || world.World.NoClip {
 			velocity.X *= decel
 			velocity.Y *= decel
-		} else if s.OnLadder != -1 { // TODO incorrect
-			velocity.X *= decel
-			velocity.Y *= ladderDecel
+		} else if s.Dashing {
+			velocity.X *= 0.96
 		} else if velocity.Y < maxGravity {
 			velocity.X *= decel
-
 			if !s.Jumping {
-				velocity.Y += gravityAccel
+				if s.OnLadder == -1 {
+					velocity.Y += gravityAccel
+				} else {
+					velocity.Y *= decel
+				}
 			}
 		}
 	}
@@ -349,9 +351,15 @@ func (s *MovementSystem) Update(ctx *gohan.Context) error {
 		velocity.X, velocity.Y = 0, 0
 	}
 	s.OnGround = collideG
-	// Reset jump counter.
-	if s.OnGround != -1 && world.World.Jumps != 0 && time.Since(s.LastJump) >= 50*time.Millisecond {
-		world.World.Jumps = 0
+	if s.OnGround != -1 || s.OnLadder != -1 {
+		// Reset jump counter.
+		if world.World.Jumps != 0 && time.Since(s.LastJump) >= 50*time.Millisecond {
+			world.World.Jumps = 0
+		}
+		// Reset dash counter.
+		if world.World.Dashes != 0 {
+			world.World.Dashes = 0
+		}
 	}
 
 	// Update debug rects.

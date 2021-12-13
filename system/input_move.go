@@ -63,11 +63,27 @@ func (s *playerMoveSystem) Update(ctx *gohan.Context) error {
 	maxSpeed := 0.5
 	maxLevitateSpeed := 1.0
 	maxYSpeed := 0.5
-	const jumpVelocity = -1
+	const jumpVelocity = -1.02
+	const dashVelocity = 5
 
 	velocity := component.Velocity(ctx)
 
 	var walkKeyPressed bool
+
+	// Jump.
+	if inpututil.IsKeyJustPressed(ebiten.KeyJ) {
+		if ((s.movement.OnGround != -1 || s.movement.OnLadder != -1) && world.World.Jumps == 0) || (world.World.CanDoubleJump && world.World.Jumps < 2) {
+			velocity.Y = jumpVelocity
+			s.movement.Jumping = true
+			s.movement.LastJump = time.Now()
+			world.World.Jumps++
+		} else if world.World.CanLevitate && world.World.Jumps == 2 {
+			world.World.Levitating = true
+		}
+	}
+	if s.movement.Jumping && (!ebiten.IsKeyPressed(ebiten.KeyJ) || time.Since(s.movement.LastJump) >= 200*time.Millisecond) {
+		s.movement.Jumping = false
+	}
 
 	if s.movement.OnGround != -1 && ebiten.IsKeyPressed(ebiten.KeyS) && !world.World.NoClip {
 		if ebiten.IsKeyPressed(ebiten.KeyA) {
@@ -176,6 +192,24 @@ func (s *playerMoveSystem) Update(ctx *gohan.Context) error {
 			s.lastWalkDirL = false
 		}
 	}
+
+	// Dash.
+	if inpututil.IsKeyJustPressed(ebiten.KeyK) && world.World.CanDash && world.World.Dashes == 0 && s.movement.OnGround == -1 && s.movement.OnLadder == -1 {
+		if s.lastWalkDirL {
+			velocity.X = -dashVelocity
+		} else {
+			velocity.X = dashVelocity
+		}
+		velocity.Y = 0
+		s.movement.Dashing = true
+		s.movement.LastDash = time.Now()
+		world.World.Dashes = 1
+	}
+	if s.movement.Dashing && (!ebiten.IsKeyPressed(ebiten.KeyK) || time.Since(s.movement.LastDash) >= 250*time.Millisecond) {
+		velocity.X = 0
+		s.movement.Dashing = false
+	}
+
 	if s.movement.OnLadder != -1 || world.World.NoClip {
 		setLadderFrames := func() {
 			if world.World.NoClip {
@@ -216,26 +250,6 @@ func (s *playerMoveSystem) Update(ctx *gohan.Context) error {
 			setLadderFrames()
 			walkKeyPressed = true
 		}
-	} else {
-		// Jump.
-		if inpututil.IsKeyJustPressed(ebiten.KeyW) {
-			if (s.movement.OnGround != -1 && world.World.Jumps == 0) || (world.World.CanDoubleJump && world.World.Jumps < 2) {
-				velocity.Y = jumpVelocity
-				s.movement.Jumping = true
-				s.movement.LastJump = time.Now()
-				world.World.Jumps++
-				// Allow one double jump when falling.
-				if world.World.Jumps == 1 && s.movement.OnGround == -1 {
-					world.World.Jumps = 2
-				}
-			} else if world.World.CanLevitate && world.World.Jumps == 2 {
-				world.World.Levitating = true
-			}
-		}
-
-		if s.movement.Jumping && (!ebiten.IsKeyPressed(ebiten.KeyW) || time.Since(s.movement.LastJump) >= 200*time.Millisecond) {
-			s.movement.Jumping = false
-		}
 	}
 
 	if world.World.Levitating {
@@ -248,17 +262,17 @@ func (s *playerMoveSystem) Update(ctx *gohan.Context) error {
 		}
 	}
 
-	if !walkKeyPressed || (s.movement.OnGround == -1 && s.movement.OnLadder == -1) || world.World.NoClip {
+	if !walkKeyPressed || s.movement.Jumping || (s.movement.OnGround == -1 && s.movement.OnLadder == -1) || world.World.NoClip {
 		sprite := component.Sprite(ctx)
 		sprite.NumFrames = 0
 		if s.lastWalkDirL {
-			if (s.movement.OnGround == -1 && s.movement.OnLadder == -1) || world.World.NoClip {
+			if (s.movement.OnGround == -1 && s.movement.OnLadder == -1) || s.movement.Jumping || world.World.NoClip {
 				sprite.Image = asset.PlayerSS.WalkL2
 			} else {
 				sprite.Image = asset.PlayerSS.IdleL
 			}
 		} else {
-			if (s.movement.OnGround == -1 && s.movement.OnLadder == -1) || world.World.NoClip {
+			if (s.movement.OnGround == -1 && s.movement.OnLadder == -1) || s.movement.Jumping || world.World.NoClip {
 				sprite.Image = asset.PlayerSS.WalkR2
 			} else {
 				sprite.Image = asset.PlayerSS.IdleR

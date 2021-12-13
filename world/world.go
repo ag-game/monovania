@@ -49,9 +49,11 @@ type GameWorld struct {
 
 	// Abilities
 	CanDoubleJump bool
+	CanDash       bool
 	CanLevitate   bool
 
 	Jumps      int
+	Dashes     int
 	Levitating bool
 
 	TriggerRects    []image.Rectangle

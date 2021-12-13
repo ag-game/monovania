@@ -20,7 +20,7 @@ func main() {
 	ebiten.SetRunnableOnUnfocused(true) // Note - this currently does nothing in ebiten
 	ebiten.SetWindowClosingHandled(true)
 	ebiten.SetFPSMode(ebiten.FPSModeVsyncOn)
-	ebiten.SetCursorShape(ebiten.CursorShapeCrosshair)
+	ebiten.SetCursorMode(ebiten.CursorModeHidden)
 
 	g, err := game.NewGame()
 	if err != nil {

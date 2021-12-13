@@ -67,14 +67,14 @@ func (s *RenderSystem) renderSprite(x float64, y float64, offsetx float64, offse
 
 	// Skip drawing off-screen tiles.
 	drawX, drawY := s.levelCoordinatesToScreen(x, y)
-	padding := float64(TileWidth) * 2
+	const padding = TileWidth * 4
 	width, height := float64(TileWidth), float64(TileWidth)
 	left := drawX
 	right := drawX + width
 	top := drawY
 	bottom := drawY + height
-	if (left < -padding || left > float64(s.ScreenW)+padding) && (top < -padding || top > float64(s.ScreenH)+padding) &&
-		(right < -padding || right > float64(s.ScreenW)+padding) && (bottom < -padding || bottom > float64(s.ScreenH)+padding) {
+	if (left < -padding || left > float64(s.ScreenW)+padding) || (top < -padding || top > float64(s.ScreenH)+padding) ||
+		(right < -padding || right > float64(s.ScreenW)+padding) || (bottom < -padding || bottom > float64(s.ScreenH)+padding) {
 		return 0
 	}
 
