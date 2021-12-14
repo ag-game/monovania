@@ -1,11 +1,9 @@
 package world
 
 import (
-	"bytes"
 	"image"
 	"log"
 	"math"
-	"net/http"
 	"path/filepath"
 	"time"
 
@@ -36,11 +34,17 @@ type GameWorld struct {
 	SpawnX, SpawnY   float64
 	ObjectGroups     []*tiled.ObjectGroup
 	StartedAt        time.Time
+	GameStarted      bool
 	GameOver         bool
 	Player           gohan.Entity
 	ScreenW, ScreenH int
 	NoClip           bool
 	Debug            int
+
+	GameStartedTicks int
+
+	FadingIn    bool
+	FadeInTicks int
 
 	OffsetX, OffsetY float64
 
@@ -52,15 +56,24 @@ type GameWorld struct {
 	CanDash       bool
 	CanLevitate   bool
 
+	// Items
+	Keys int
+
 	Jumps      int
 	Dashes     int
 	Levitating bool
+
+	Rewinding bool
+
+	MessageVisible bool
+	MessageTitle   string
+	MessageText    string
 
 	TriggerRects    []image.Rectangle
 	TriggerEntities []gohan.Entity
 	TriggerNames    []string
 
-	DisableEsc bool // TODO
+	DisableEsc bool
 }
 
 func TileToGameCoords(x, y int) (float64, float64) {
@@ -70,16 +83,11 @@ func TileToGameCoords(x, y int) (float64, float64) {
 
 func LoadMap(filePath string) {
 	loader := tiled.Loader{
-		FileSystem: http.FS(asset.FS),
-	}
-
-	b, err := asset.FS.ReadFile(filePath)
-	if err != nil {
-		panic(err)
+		FileSystem: asset.FS,
 	}
 
 	// Parse .tmx file.
-	m, err := loader.LoadFromReader("/", bytes.NewReader(b))
+	m, err := loader.LoadFromFile(filePath)
 	if err != nil {
 		log.Fatalf("error parsing world: %+v", err)
 	}
@@ -176,9 +184,6 @@ func LoadMap(filePath string) {
 				if t == nil || t.Nil {
 					continue // No tile at this position.
 				}
-
-				// TODO use Tileset.Animation
-				// use current time in millis (cached) % total animation time
 
 				tileImg := tileCache[t.Tileset.FirstGID+t.ID]
 				if tileImg == nil {

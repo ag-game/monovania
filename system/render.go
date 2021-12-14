@@ -1,6 +1,8 @@
 package system
 
 import (
+	"image"
+	"image/color"
 	_ "image/png"
 	"time"
 
@@ -9,10 +11,20 @@ import (
 	"code.rocketnine.space/tslocum/monovania/engine"
 	"code.rocketnine.space/tslocum/monovania/world"
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 	"golang.org/x/image/colornames"
 )
 
-const TileWidth = 16
+const (
+	TileWidth = 16
+
+	logoText      = "POWERED BY EBITEN"
+	logoTextScale = 4.75
+	logoTextWidth = 6.0 * float64(len(logoText)) * logoTextScale
+	logoTime      = 144 * 3.5
+
+	fadeInTime = 144 * 1.25
+)
 
 var CamX, CamY float64
 
@@ -25,17 +37,22 @@ type RenderSystem struct {
 
 	renderer gohan.Entity
 
-	debugImg *ebiten.Image
+	logoImg *ebiten.Image
 }
 
 func NewRenderSystem() *RenderSystem {
 	s := &RenderSystem{
 		renderer: engine.Engine.NewEntity(),
+		logoImg:  ebiten.NewImage(1, 1),
 		op:       &ebiten.DrawImageOptions{},
 		camScale: 4,
 	}
 
 	return s
+}
+
+func (s *RenderSystem) SizeUpdated() {
+	s.drawLogo()
 }
 
 func (s *RenderSystem) Needs() []gohan.ComponentID {
@@ -63,6 +80,13 @@ func (s *RenderSystem) levelCoordinatesToScreen(x, y float64) (float64, float64)
 func (s *RenderSystem) renderSprite(x float64, y float64, offsetx float64, offsety float64, angle float64, geoScale float64, colorScale float64, alpha float64, hFlip bool, vFlip bool, sprite *ebiten.Image, target *ebiten.Image) int {
 	if alpha < .01 || colorScale < .01 {
 		return 0
+	}
+
+	if world.World.FadingIn {
+		alpha = float64(world.World.FadeInTicks) / (fadeInTime / 2)
+		if alpha > 1 {
+			alpha = 1
+		}
 	}
 
 	// Skip drawing off-screen tiles.
@@ -114,8 +138,57 @@ func (s *RenderSystem) renderSprite(x float64, y float64, offsetx float64, offse
 	return 1
 }
 
+func (s *RenderSystem) drawLogo() {
+	s.logoImg = ebiten.NewImage(s.ScreenW, s.ScreenH)
+	s.logoImg.Fill(color.Black)
+
+	// Draw Ebiten logo.
+	logoSize := 172
+	totalSize := int(float64(logoSize) * 2.778)
+	logoColor := color.RGBA{219, 86, 32, 255}
+	logoOffset := int(float64(logoSize) * (4.0 / 9.0))
+	tailWidth := int(float64(logoSize) * (5.0 / 9.0))
+	x := (s.ScreenW / 2) - (totalSize / 2)
+	y := (s.ScreenH / 2)
+	for i := 0; i < 3; i++ {
+		offset := i * logoOffset
+		s.logoImg.SubImage(image.Rect(x+offset, y-offset, x+logoSize+offset, y+logoSize-offset)).(*ebiten.Image).Fill(logoColor)
+	}
+	offset := 4 * logoOffset
+	s.logoImg.SubImage(image.Rect(x+offset, y-offset, x+tailWidth+offset, y+logoSize-offset)).(*ebiten.Image).Fill(logoColor)
+	s.logoImg.SubImage(image.Rect(x+offset+logoOffset, y-offset+logoOffset, x+offset+logoSize, y-offset+logoSize)).(*ebiten.Image).Fill(logoColor)
+
+	img := ebiten.NewImage(200, 200)
+	ebitenutil.DebugPrint(img, logoText)
+
+	op := &ebiten.DrawImageOptions{}
+	op.GeoM.Scale(logoTextScale, logoTextScale)
+	op.GeoM.Translate(float64(s.ScreenW)/2-float64(logoTextWidth)/2, float64(s.ScreenH)/2+float64(logoSize))
+	s.logoImg.DrawImage(img, op)
+}
+
 func (s *RenderSystem) Draw(ctx *gohan.Context, screen *ebiten.Image) error {
-	if world.World.GameOver {
+	if !world.World.GameStarted {
+		if ctx.Entity == world.World.Player {
+			screen.Fill(color.RGBA{0, 0, 0, 255})
+
+			var alpha float64
+			if world.World.GameStartedTicks <= 144*.5 {
+				alpha = float64(world.World.GameStartedTicks) / (144 * .5)
+			} else if world.World.GameStartedTicks < 144*2.5 {
+				alpha = 1.0
+			} else {
+				alpha = 1.0 - (float64(world.World.GameStartedTicks-(144*2.5)) / (144 * 0.5))
+			}
+			if alpha > 1 {
+				alpha = 1
+			}
+			op := &ebiten.DrawImageOptions{}
+			op.ColorM.ChangeHSV(0, 1, alpha)
+			screen.DrawImage(s.logoImg, op)
+		}
+		return nil
+	} else if world.World.GameOver {
 		if ctx.Entity == world.World.Player {
 			screen.Fill(colornames.Darkred)
 		}

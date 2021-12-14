@@ -1,7 +1,6 @@
 package system
 
 import (
-	"log"
 	"os"
 	"path"
 	"runtime"
@@ -37,8 +36,6 @@ func (s *profileSystem) Uses() []gohan.ComponentID {
 func (s *profileSystem) Update(_ *gohan.Context) error {
 	if ebiten.IsKeyPressed(ebiten.KeyControl) && inpututil.IsKeyJustPressed(ebiten.KeyP) {
 		if s.cpuProfile == nil {
-			log.Println("CPU profiling started...")
-
 			runtime.SetCPUProfileRate(1000)
 
 			homeDir, err := os.UserHomeDir()
@@ -61,7 +58,6 @@ func (s *profileSystem) Update(_ *gohan.Context) error {
 			s.cpuProfile.Close()
 			s.cpuProfile = nil
 
-			log.Println("CPU profiling stopped")
 		}
 	}
 	return nil

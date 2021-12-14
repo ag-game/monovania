@@ -3,6 +3,7 @@ package system
 import (
 	"image"
 	"image/color"
+	"math"
 	"time"
 
 	"code.rocketnine.space/tslocum/gohan"
@@ -11,6 +12,8 @@ import (
 	"code.rocketnine.space/tslocum/monovania/world"
 	"github.com/hajimehoshi/ebiten/v2"
 )
+
+const rewindThreshold = 1
 
 type MovementSystem struct {
 	ScreenW, ScreenH float64
@@ -33,6 +36,11 @@ type MovementSystem struct {
 	debugCollisionRects []gohan.Entity
 	debugLadderRects    []gohan.Entity
 	debugFireRects      []gohan.Entity
+
+	playerPositions     [][2]float64
+	playerPosition      [2]float64
+	playerPositionTicks int
+	recordedPosition    bool
 }
 
 func NewMovementSystem() *MovementSystem {
@@ -213,15 +221,14 @@ func (_ *MovementSystem) Uses() []gohan.ComponentID {
 	return nil
 }
 
-func (s *MovementSystem) checkFire(r image.Rectangle) {
+func (s *MovementSystem) checkFire(ctx *gohan.Context, r image.Rectangle) {
 	for _, fireRect := range s.fireRects {
 		if r.Overlaps(fireRect) {
-			//world.World.GameOver = true
-			// TODO
-			position := engine.Engine.Component(world.World.Player, component.PositionComponentID).(*component.PositionComponent)
-			velocity := engine.Engine.Component(world.World.Player, component.VelocityComponentID).(*component.VelocityComponent)
-			position.X, position.Y = world.World.SpawnX, world.World.SpawnY
-			velocity.X, velocity.Y = 0, 0
+			world.World.GameOver = true
+
+			position := component.Position(ctx)
+			s.RecordPosition(position)
+
 			return
 		}
 	}
@@ -235,6 +242,8 @@ func (s *MovementSystem) checkTriggers(r image.Rectangle) {
 				world.World.CanDoubleJump = true
 			case "DASH":
 				world.World.CanDash = true
+			case "KEY":
+				world.World.Keys++
 			default:
 				panic("unknown trigger " + world.World.TriggerNames[i])
 			}
@@ -245,17 +254,23 @@ func (s *MovementSystem) checkTriggers(r image.Rectangle) {
 			world.World.TriggerRects = append(world.World.TriggerRects[:i], world.World.TriggerRects[i+1:]...)
 			world.World.TriggerEntities = append(world.World.TriggerEntities[:i], world.World.TriggerEntities[i+1:]...)
 			world.World.TriggerNames = append(world.World.TriggerNames[:i], world.World.TriggerNames[i+1:]...)
+
+			// TODO Show ability info and usage popup.
 			return
 		}
 	}
 }
 
-func (s *MovementSystem) checkCollisions(r image.Rectangle) {
-	s.checkFire(r)
+func (s *MovementSystem) checkCollisions(ctx *gohan.Context, r image.Rectangle) {
+	s.checkFire(ctx, r)
 	s.checkTriggers(r)
 }
 
 func (s *MovementSystem) Update(ctx *gohan.Context) error {
+	if world.World.GameOver {
+		return nil
+	}
+
 	lastOnGround := s.OnGround
 	lastOnLadder := s.OnLadder
 
@@ -263,6 +278,10 @@ func (s *MovementSystem) Update(ctx *gohan.Context) error {
 	velocity := component.Velocity(ctx)
 
 	bullet := ctx.Entity != world.World.Player
+
+	if ctx.Entity == world.World.Player && world.World.Rewinding {
+		return nil
+	}
 
 	// TODO apply left and right X collision adjustments (too large, can hang entirely off edge of cliff)
 
@@ -324,19 +343,19 @@ func (s *MovementSystem) Update(ctx *gohan.Context) error {
 		}
 		if playerRectX.Overlaps(rect) {
 			collideX = i
-			s.checkCollisions(playerRectX)
+			s.checkCollisions(ctx, playerRectX)
 		}
 		if playerRectY.Overlaps(rect) {
 			collideY = i
-			s.checkCollisions(playerRectY)
+			s.checkCollisions(ctx, playerRectY)
 		}
 		if playerRectXY.Overlaps(rect) {
 			collideXY = i
-			s.checkCollisions(playerRectXY)
+			s.checkCollisions(ctx, playerRectXY)
 		}
 		if playerRectG.Overlaps(rect) {
 			collideG = i
-			s.checkCollisions(playerRectG)
+			s.checkCollisions(ctx, playerRectG)
 		}
 	}
 	if collideXY == -1 {
@@ -362,6 +381,22 @@ func (s *MovementSystem) Update(ctx *gohan.Context) error {
 		}
 	}
 
+	// Remember positions to support rewinding time.
+	const recordTicks = 144 / 2
+	if ctx.Entity == world.World.Player {
+		if world.World.Rewinding {
+			s.playerPositionTicks = 0
+		} else {
+			s.playerPositionTicks++
+			if s.playerPositionTicks >= recordTicks || !s.recordedPosition {
+				s.RecordPosition(position)
+				s.playerPositionTicks = 0
+				s.recordedPosition = true
+			}
+		}
+	}
+	// TODO: Does this use enough memory to require pruning positions?
+
 	// Update debug rects.
 
 	if s.OnGround != lastOnGround || s.OnLadder != lastOnLadder {
@@ -373,4 +408,16 @@ func (s *MovementSystem) Update(ctx *gohan.Context) error {
 
 func (_ *MovementSystem) Draw(_ *gohan.Context, screen *ebiten.Image) error {
 	return gohan.ErrSystemWithoutDraw
+}
+
+func (s *MovementSystem) RecordPosition(position *component.PositionComponent) {
+	if math.Abs(position.X-s.playerPosition[0]) >= rewindThreshold || math.Abs(position.Y-s.playerPosition[1]) >= rewindThreshold {
+		s.playerPosition[0], s.playerPosition[1] = position.X, position.Y
+		s.playerPositions = append(s.playerPositions, s.playerPosition)
+	}
+}
+
+func (s *MovementSystem) RemoveLastPosition() {
+	s.playerPositions = s.playerPositions[:len(s.playerPositions)-1]
+	s.playerPosition = s.playerPositions[len(s.playerPositions)-1]
 }

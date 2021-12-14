@@ -120,6 +120,7 @@ func (g *game) Layout(outsideWidth, outsideHeight int) (int, int) {
 		g.w, g.h = w, h
 		g.movementSystem.ScreenW, g.movementSystem.ScreenH = float64(w), float64(h)
 		g.renderSystem.ScreenW, g.renderSystem.ScreenH = w, h
+		g.renderSystem.SizeUpdated()
 	}
 	return g.w, g.h
 }
@@ -151,7 +152,7 @@ func (g *game) Draw(screen *ebiten.Image) {
 func (g *game) addSystems() {
 	ecs := engine.Engine
 
-	g.movementSystem = system.NewMovementSystem() // TODO move into component
+	g.movementSystem = system.NewMovementSystem()
 
 	ecs.AddSystem(system.NewPlayerMoveSystem(g.player, g.movementSystem))
 
@@ -164,9 +165,17 @@ func (g *game) addSystems() {
 	g.renderSystem = system.NewRenderSystem()
 	ecs.AddSystem(g.renderSystem)
 
+	ecs.AddSystem(system.NewRenderMessageSystem(g.player))
+
 	ecs.AddSystem(system.NewRenderDebugTextSystem(g.player))
 
 	ecs.AddSystem(system.NewProfileSystem(g.player))
+
+	// TODO
+	/*
+		world.World.MessageVisible = true
+		world.World.MessageText = "BOMB"
+		world.World.MessageText = "V & set it with X button."*/
 }
 
 func (g *game) loadAssets() error {

@@ -2,6 +2,7 @@ package system
 
 import (
 	"log"
+	"os"
 	"time"
 
 	"code.rocketnine.space/tslocum/gohan"
@@ -18,6 +19,9 @@ type playerMoveSystem struct {
 	player       gohan.Entity
 	movement     *MovementSystem
 	lastWalkDirL bool
+
+	rewindTicks    int
+	nextRewindTick int
 }
 
 func NewPlayerMoveSystem(player gohan.Entity, m *MovementSystem) *playerMoveSystem {
@@ -29,6 +33,7 @@ func NewPlayerMoveSystem(player gohan.Entity, m *MovementSystem) *playerMoveSyst
 
 func (_ *playerMoveSystem) Needs() []gohan.ComponentID {
 	return []gohan.ComponentID{
+		component.PositionComponentID,
 		component.VelocityComponentID,
 		component.WeaponComponentID,
 		component.SpriteComponentID,
@@ -40,10 +45,36 @@ func (_ *playerMoveSystem) Uses() []gohan.ComponentID {
 }
 
 func (s *playerMoveSystem) Update(ctx *gohan.Context) error {
+	if ebiten.IsKeyPressed(ebiten.KeyEscape) && !world.World.DisableEsc {
+		os.Exit(0)
+		return nil
+	}
+
+	if !world.World.GameStarted {
+		world.World.GameStartedTicks++
+		if world.World.GameStartedTicks == logoTime {
+			world.World.GameStarted = true
+			world.World.FadingIn = true
+		}
+		return nil
+	}
+
+	if world.World.FadingIn {
+		world.World.FadeInTicks++
+		if world.World.FadeInTicks == fadeInTime {
+			world.World.FadingIn = false
+		}
+	}
+
 	if ebiten.IsKeyPressed(ebiten.KeyControl) && inpututil.IsKeyJustPressed(ebiten.KeyV) {
-		world.World.Debug++
-		if world.World.Debug > 2 {
+		v := 1
+		if ebiten.IsKeyPressed(ebiten.KeyShift) {
+			v = 2
+		}
+		if world.World.Debug == v {
 			world.World.Debug = 0
+		} else {
+			world.World.Debug = v
 		}
 		s.movement.UpdateDebugCollisionRects()
 		return nil
@@ -57,6 +88,115 @@ func (s *playerMoveSystem) Update(ctx *gohan.Context) error {
 		world.World.SpawnX, world.World.SpawnY = position.X, position.Y-12
 		log.Printf("Spawn point set to %.0f,%.0f", world.World.SpawnX, world.World.SpawnY)
 		return nil
+	}
+
+	setWalkFrames := func() {
+		if world.World.NoClip {
+			return
+		}
+		sprite := component.Sprite(ctx)
+		if s.lastWalkDirL {
+			sprite.Frames = []*ebiten.Image{
+				asset.PlayerSS.WalkL1,
+				asset.PlayerSS.IdleL,
+				asset.PlayerSS.WalkL2,
+				asset.PlayerSS.IdleL,
+			}
+		} else {
+			sprite.Frames = []*ebiten.Image{
+				asset.PlayerSS.WalkR1,
+				asset.PlayerSS.IdleR,
+				asset.PlayerSS.WalkR2,
+				asset.PlayerSS.IdleR,
+			}
+		}
+		sprite.NumFrames = 4
+		sprite.FrameTime = 150 * time.Millisecond
+	}
+
+	setJumpAndIdleFrames := func() {
+		sprite := component.Sprite(ctx)
+		sprite.NumFrames = 0
+		if s.lastWalkDirL {
+			if (s.movement.OnGround == -1 && s.movement.OnLadder == -1) || s.movement.Jumping || world.World.NoClip {
+				sprite.Image = asset.PlayerSS.WalkL2
+			} else {
+				sprite.Image = asset.PlayerSS.IdleL
+			}
+		} else {
+			if (s.movement.OnGround == -1 && s.movement.OnLadder == -1) || s.movement.Jumping || world.World.NoClip {
+				sprite.Image = asset.PlayerSS.WalkR2
+			} else {
+				sprite.Image = asset.PlayerSS.IdleR
+			}
+		}
+	}
+
+	// Rewind time.
+	const minRewindTicks = 144 / 3
+	const maxRewindTicks = 144 * 1.5
+	if ebiten.IsKeyPressed(ebiten.KeyR) {
+		if len(s.movement.playerPositions) > 1 {
+			position := component.Position(ctx)
+			if !world.World.Rewinding {
+				world.World.Rewinding = true
+				world.World.GameOver = false
+
+				velocity := component.Velocity(ctx)
+				velocity.X, velocity.Y = 0, 0
+
+				s.movement.RecordPosition(position)
+
+				setWalkFrames()
+			}
+
+			lastPos := s.movement.playerPositions[len(s.movement.playerPositions)-1]
+			nextPos := s.movement.playerPositions[len(s.movement.playerPositions)-2]
+			rx, ry := nextPos[0]-lastPos[0], nextPos[1]-lastPos[1]
+
+			if s.rewindTicks == 0 {
+				dx, dy := deltaXY(lastPos[0], lastPos[1], nextPos[0], nextPos[1])
+
+				s.nextRewindTick = 144 * int((dx+dy)/150)
+				if s.nextRewindTick < minRewindTicks {
+					s.nextRewindTick = minRewindTicks
+				} else if s.nextRewindTick > maxRewindTicks {
+					s.nextRewindTick = maxRewindTicks
+				}
+				s.rewindTicks++
+
+				// Update player direction.
+				rewindDirL := rx >= 0
+				if s.lastWalkDirL != rewindDirL {
+					s.lastWalkDirL = rewindDirL
+					setWalkFrames()
+				}
+				return nil
+			}
+
+			pct := 1.0
+			if s.nextRewindTick > 0 {
+				pct = float64(s.rewindTicks) / float64(s.nextRewindTick)
+				if pct > 1 {
+					pct = 1
+				}
+			}
+			position.X, position.Y = lastPos[0]+(rx*pct), lastPos[1]+(ry*pct)
+
+			if s.rewindTicks == s.nextRewindTick {
+				s.movement.RemoveLastPosition()
+				s.rewindTicks = 0
+			} else {
+				s.rewindTicks++
+			}
+		} else {
+			setJumpAndIdleFrames()
+		}
+		return nil
+	} else if s.nextRewindTick != 0 {
+		s.rewindTicks = 0
+		s.nextRewindTick = 0
+		world.World.Rewinding = false
 	}
 
 	moveSpeed := 0.1
@@ -86,11 +226,13 @@ func (s *playerMoveSystem) Update(ctx *gohan.Context) error {
 	}
 
 	if s.movement.OnGround != -1 && ebiten.IsKeyPressed(ebiten.KeyS) && !world.World.NoClip {
+		// Update player direction.
 		if ebiten.IsKeyPressed(ebiten.KeyA) {
 			s.lastWalkDirL = true
 		} else if ebiten.IsKeyPressed(ebiten.KeyD) {
 			s.lastWalkDirL = false
 		}
+
 		// Duck and look down.
 		sprite := component.Sprite(ctx)
 		sprite.NumFrames = 0
@@ -211,35 +353,12 @@ func (s *playerMoveSystem) Update(ctx *gohan.Context) error {
 	}
 
 	if s.movement.OnLadder != -1 || world.World.NoClip {
-		setLadderFrames := func() {
-			if world.World.NoClip {
-				return
-			}
-			sprite := component.Sprite(ctx)
-			if s.lastWalkDirL {
-				sprite.Frames = []*ebiten.Image{
-					asset.PlayerSS.WalkL1,
-					asset.PlayerSS.IdleL,
-					asset.PlayerSS.WalkL2,
-					asset.PlayerSS.IdleL,
-				}
-			} else {
-				sprite.Frames = []*ebiten.Image{
-					asset.PlayerSS.WalkR1,
-					asset.PlayerSS.IdleR,
-					asset.PlayerSS.WalkR2,
-					asset.PlayerSS.IdleR,
-				}
-			}
-			sprite.NumFrames = 4
-			sprite.FrameTime = 150 * time.Millisecond
-		}
 		if ebiten.IsKeyPressed(ebiten.KeyW) {
 			if velocity.Y > -maxYSpeed || world.World.NoClip {
 				velocity.Y -= moveSpeed
 			}
 
-			setLadderFrames()
+			setWalkFrames()
 			walkKeyPressed = true
 		}
 		if ebiten.IsKeyPressed(ebiten.KeyS) && s.movement.OnGround == -1 {
@@ -247,7 +366,7 @@ func (s *playerMoveSystem) Update(ctx *gohan.Context) error {
 				velocity.Y += moveSpeed
 			}
 
-			setLadderFrames()
+			setWalkFrames()
 			walkKeyPressed = true
 		}
 	}
@@ -263,21 +382,7 @@ func (s *playerMoveSystem) Update(ctx *gohan.Context) error {
 	}
 
 	if !walkKeyPressed || s.movement.Jumping || (s.movement.OnGround == -1 && s.movement.OnLadder == -1) || world.World.NoClip {
-		sprite := component.Sprite(ctx)
-		sprite.NumFrames = 0
-		if s.lastWalkDirL {
-			if (s.movement.OnGround == -1 && s.movement.OnLadder == -1) || s.movement.Jumping || world.World.NoClip {
-				sprite.Image = asset.PlayerSS.WalkL2
-			} else {
-				sprite.Image = asset.PlayerSS.IdleL
-			}
-		} else {
-			if (s.movement.OnGround == -1 && s.movement.OnLadder == -1) || s.movement.Jumping || world.World.NoClip {
-				sprite.Image = asset.PlayerSS.WalkR2
-			} else {
-				sprite.Image = asset.PlayerSS.IdleR
-			}
-		}
+		setJumpAndIdleFrames()
 	}
 
 	return nil
@@ -285,4 +390,15 @@ func (s *playerMoveSystem) Update(ctx *gohan.Context) error {
 
 func (s *playerMoveSystem) Draw(_ *gohan.Context, _ *ebiten.Image) error {
 	return gohan.ErrSystemWithoutDraw
+}
+
+func deltaXY(x1, y1, x2, y2 float64) (dx float64, dy float64) {
+	dx, dy = x1-x2, y1-y2
+	if dx < 0 {
+		dx *= -1
+	}
+	if dy < 0 {
+		dy *= -1
+	}
+	return dx, dy
 }
