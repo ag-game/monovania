@@ -197,6 +197,7 @@ func (s *playerMoveSystem) Update(ctx *gohan.Context) error {
 		s.rewindTicks = 0
 		s.nextRewindTick = 0
 		world.World.Rewinding = false
+		s.movement.RemoveLastPosition()
 	}
 
 	moveSpeed := 0.1

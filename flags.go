@@ -18,12 +18,14 @@ func parseFlags() {
 	var (
 		fullscreen bool
 		spawn      string
+		noSplash   bool
 	)
 	flag.BoolVar(&fullscreen, "fullscreen", false, "run in fullscreen mode")
 	flag.StringVar(&spawn, "spawn", "", "spawn X,Y position")
 	flag.BoolVar(&world.World.CanDoubleJump, "doublejump", false, "start with double jump ability")
 	flag.BoolVar(&world.World.CanDash, "dash", false, "start with dash ability")
 	flag.BoolVar(&world.World.CanLevitate, "levitate", false, "start with levitate ability")
+	flag.BoolVar(&noSplash, "no-splash", false, "skip splash screen")
 	flag.IntVar(&world.World.Debug, "debug", 0, "print debug information")
 	flag.Parse()
 
@@ -46,5 +48,9 @@ func parseFlags() {
 			position := engine.Engine.Component(world.World.Player, component.PositionComponentID).(*component.PositionComponent)
 			position.X, position.Y = world.World.SpawnX, world.World.SpawnY
 		}
+	}
+
+	if noSplash {
+		world.World.GameStarted = true
 	}
 }

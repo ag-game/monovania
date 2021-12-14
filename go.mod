@@ -18,5 +18,5 @@ require (
 	golang.org/x/exp v0.0.0-20211213173848-79cd87713b62 // indirect
 	golang.org/x/mobile v0.0.0-20211207041440-4e6c2922fdee // indirect
 	golang.org/x/sync v0.0.0-20210220032951-036812b2e83c // indirect
-	golang.org/x/sys v0.0.0-20211213223007-03aa0b5f6827 // indirect
+	golang.org/x/sys v0.0.0-20211214150614-024a26f5d6e2 // indirect
 )

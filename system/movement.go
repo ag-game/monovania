@@ -418,6 +418,14 @@ func (s *MovementSystem) RecordPosition(position *component.PositionComponent) {
 }
 
 func (s *MovementSystem) RemoveLastPosition() {
+	if len(s.playerPositions) == 0 {
+		return
+	}
+
 	s.playerPositions = s.playerPositions[:len(s.playerPositions)-1]
-	s.playerPosition = s.playerPositions[len(s.playerPositions)-1]
+	if len(s.playerPositions) > 1 {
+		s.playerPosition = s.playerPositions[len(s.playerPositions)-1]
+	} else {
+		s.playerPosition[0], s.playerPosition[1] = 0, 0
+	}
 }

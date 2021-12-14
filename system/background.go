@@ -42,14 +42,6 @@ func (s *RenderBackgroundSystem) Draw(ctx *gohan.Context, screen *ebiten.Image) 
 		return nil
 	}
 
-	alpha := 1.0
-	if world.World.FadingIn {
-		alpha = float64(world.World.FadeInTicks) / fadeInTime
-		if alpha > 1 {
-			alpha = 1
-		}
-	}
-
 	position := component.Position(ctx)
 
 	pctX, pctY := position.X/(512*16), position.Y/(512*16)
@@ -59,30 +51,18 @@ func (s *RenderBackgroundSystem) Draw(ctx *gohan.Context, screen *ebiten.Image) 
 
 	op := &ebiten.DrawImageOptions{}
 	op.GeoM.Scale(scale, scale)
-	if world.World.FadingIn {
-		op.ColorM.Scale(1, 1, 1, alpha)
-	}
 	screen.DrawImage(asset.ImgBackground1, op)
 	op = &ebiten.DrawImageOptions{}
 	op.GeoM.Scale(scale, scale)
 	op.GeoM.Translate(-offsetX*0.5, -offsetY*0.5)
-	if world.World.FadingIn {
-		op.ColorM.Scale(1, 1, 1, alpha)
-	}
 	screen.DrawImage(asset.ImgBackground2, op)
 	op = &ebiten.DrawImageOptions{}
 	op.GeoM.Scale(scale, scale)
 	op.GeoM.Translate(-offsetX*0.75, -offsetY*0.75)
-	if world.World.FadingIn {
-		op.ColorM.Scale(1, 1, 1, alpha)
-	}
 	screen.DrawImage(asset.ImgBackground3, op)
 	op = &ebiten.DrawImageOptions{}
 	op.GeoM.Scale(scale, scale)
 	op.GeoM.Translate(-offsetX, -offsetY)
-	if world.World.FadingIn {
-		op.ColorM.Scale(1, 1, 1, alpha)
-	}
 	screen.DrawImage(asset.ImgBackground4, op)
 	return nil
 }

@@ -66,6 +66,7 @@ type game struct {
 
 	movementSystem *system.MovementSystem
 	renderSystem   *system.RenderSystem
+	messageSystem  *system.RenderMessageSystem
 
 	sync.Mutex
 	camScale float64
@@ -120,7 +121,7 @@ func (g *game) Layout(outsideWidth, outsideHeight int) (int, int) {
 		g.w, g.h = w, h
 		g.movementSystem.ScreenW, g.movementSystem.ScreenH = float64(w), float64(h)
 		g.renderSystem.ScreenW, g.renderSystem.ScreenH = w, h
-		g.renderSystem.SizeUpdated()
+		g.messageSystem.SizeUpdated()
 	}
 	return g.w, g.h
 }
@@ -165,7 +166,8 @@ func (g *game) addSystems() {
 	g.renderSystem = system.NewRenderSystem()
 	ecs.AddSystem(g.renderSystem)
 
-	ecs.AddSystem(system.NewRenderMessageSystem(g.player))
+	g.messageSystem = system.NewRenderMessageSystem(g.player)
+	ecs.AddSystem(g.messageSystem)
 
 	ecs.AddSystem(system.NewRenderDebugTextSystem(g.player))
 
