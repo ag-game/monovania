@@ -91,7 +91,7 @@ func LoadMap(filePath string) {
 	}
 
 	// Parse .tmx file.
-	m, err := loader.LoadFromFile(filePath)
+	m, err := loader.LoadFromFile(filepath.FromSlash(filePath))
 	if err != nil {
 		log.Fatalf("error parsing world: %+v", err)
 	}
@@ -101,7 +101,7 @@ func LoadMap(filePath string) {
 	tileset := m.Tilesets[0]
 
 	imgPath := filepath.Join("./map/", tileset.Image.Source)
-	f, err := asset.FS.Open(imgPath)
+	f, err := asset.FS.Open(filepath.FromSlash(imgPath))
 	if err != nil {
 		panic(err)
 	}
