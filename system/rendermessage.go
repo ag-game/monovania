@@ -6,28 +6,29 @@ import (
 	_ "image/png"
 	"strings"
 
-	"golang.org/x/image/colornames"
-
 	"code.rocketnine.space/tslocum/gohan"
 	"code.rocketnine.space/tslocum/monovania/component"
 	"code.rocketnine.space/tslocum/monovania/world"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"golang.org/x/image/colornames"
 )
 
 type RenderMessageSystem struct {
-	player   gohan.Entity
-	op       *ebiten.DrawImageOptions
-	logoImg  *ebiten.Image
-	debugImg *ebiten.Image
+	player  gohan.Entity
+	op      *ebiten.DrawImageOptions
+	logoImg *ebiten.Image
+	msgImg  *ebiten.Image
+	tmpImg  *ebiten.Image
 }
 
 func NewRenderMessageSystem(player gohan.Entity) *RenderMessageSystem {
 	s := &RenderMessageSystem{
-		player:   player,
-		op:       &ebiten.DrawImageOptions{},
-		logoImg:  ebiten.NewImage(1, 1),
-		debugImg: ebiten.NewImage(200, 200),
+		player:  player,
+		op:      &ebiten.DrawImageOptions{},
+		logoImg: ebiten.NewImage(1, 1),
+		msgImg:  ebiten.NewImage(1, 1),
+		tmpImg:  ebiten.NewImage(200, 200),
 	}
 
 	return s
@@ -50,8 +51,31 @@ func (s *RenderMessageSystem) Update(_ *gohan.Context) error {
 }
 
 func (s *RenderMessageSystem) Draw(ctx *gohan.Context, screen *ebiten.Image) error {
+	if world.World.GameOver {
+		// Draw game over screen.
+		if ctx.Entity == world.World.Player {
+			screen.Fill(colornames.Darkred)
+		}
+		return nil
+	}
+
+	if !world.World.MessageVisible {
+		return nil
+	}
+
+	// Draw message.
+	if world.World.MessageUpdated {
+		s.drawMessage()
+	}
+	bounds := s.msgImg.Bounds()
+	x := (float64(world.World.ScreenW) / 2) - (float64(bounds.Dx()) / 2)
+	y := (float64(world.World.ScreenH) / 2) - float64(bounds.Dy()) - 8
+	s.op.GeoM.Reset()
+	s.op.GeoM.Translate(x, y)
+	screen.DrawImage(s.msgImg, s.op)
+
+	// Draw logo.
 	if !world.World.GameStarted || world.World.FadingIn {
-		// Draw logo.
 		if ctx.Entity == world.World.Player {
 			var alpha float64
 			if !world.World.GameStarted {
@@ -66,33 +90,23 @@ func (s *RenderMessageSystem) Draw(ctx *gohan.Context, screen *ebiten.Image) err
 			if alpha > 1 {
 				alpha = 1
 			}
-			op := &ebiten.DrawImageOptions{}
+			s.op.GeoM.Reset()
 			if !world.World.GameStarted {
-				op.ColorM.ChangeHSV(0, 1, alpha)
+				s.op.ColorM.ChangeHSV(0, 1, alpha)
 			} else {
-				op.ColorM.Scale(1, 1, 1, alpha)
+				s.op.ColorM.Scale(1, 1, 1, alpha)
 			}
-			screen.DrawImage(s.logoImg, op)
+			screen.DrawImage(s.logoImg, s.op)
+			s.op.ColorM.Reset()
 		}
-		if !world.World.GameStarted {
-			return nil
-		}
-	} else if world.World.GameOver {
-		// Draw game over screen.
-		if ctx.Entity == world.World.Player {
-			screen.Fill(colornames.Darkred)
-		}
-		return nil
 	}
+	return nil
+}
 
-	if !world.World.MessageVisible {
-		return nil
-	}
+func (s *RenderMessageSystem) drawMessage() {
+	message := world.World.MessageText + "\n\n<ENTER> TO CONTINUE."
 
-	/*position := component.Position(ctx)
-	velocity := component.Velocity(ctx)*/
-
-	split := strings.Split(world.World.MessageText, "\n")
+	split := strings.Split(message, "\n")
 	width := 0
 	for _, line := range split {
 		lineSize := len(line) * 12
@@ -103,19 +117,19 @@ func (s *RenderMessageSystem) Draw(ctx *gohan.Context, screen *ebiten.Image) err
 	height := len(split) * 32
 
 	const padding = 8
+	width, height = width+padding*2, height+padding*2
 
-	x, y := (world.World.ScreenW-width)/2, (world.World.ScreenH-height)/2
+	s.msgImg = ebiten.NewImage(width, height)
+	s.msgImg.Fill(color.RGBA{17, 17, 17, 255})
 
-	screen.SubImage(image.Rect(x-padding, y-padding, x+width+padding, y+height+padding)).(*ebiten.Image).Fill(color.Black)
-
-	s.debugImg.Clear()
+	s.tmpImg.Clear()
+	s.tmpImg = ebiten.NewImage(width*2, height*2)
 	s.op.GeoM.Reset()
 	s.op.GeoM.Scale(2, 2)
-	s.op.GeoM.Translate(float64(world.World.ScreenW-width)/2, float64(world.World.ScreenH-height)/2)
-	ebitenutil.DebugPrint(s.debugImg, world.World.MessageText)
-	screen.DrawImage(s.debugImg, s.op)
-
-	return nil
+	s.op.GeoM.Translate(float64(padding), float64(padding))
+	ebitenutil.DebugPrint(s.tmpImg, message)
+	s.msgImg.DrawImage(s.tmpImg, s.op)
+	s.op.ColorM.Reset()
 }
 
 func (s *RenderMessageSystem) drawLogo() {
@@ -129,7 +143,7 @@ func (s *RenderMessageSystem) drawLogo() {
 	logoOffset := int(float64(logoSize) * (4.0 / 9.0))
 	tailWidth := int(float64(logoSize) * (5.0 / 9.0))
 	x := (world.World.ScreenW / 2) - (totalSize / 2)
-	y := (world.World.ScreenH / 2)
+	y := world.World.ScreenH / 2
 	for i := 0; i < 3; i++ {
 		offset := i * logoOffset
 		s.logoImg.SubImage(image.Rect(x+offset, y-offset, x+logoSize+offset, y+logoSize-offset)).(*ebiten.Image).Fill(logoColor)
@@ -149,4 +163,5 @@ func (s *RenderMessageSystem) drawLogo() {
 
 func (s *RenderMessageSystem) SizeUpdated() {
 	s.drawLogo()
+	s.drawMessage()
 }

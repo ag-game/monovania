@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"code.rocketnine.space/tslocum/gohan"
+	"code.rocketnine.space/tslocum/monovania/asset"
 	"code.rocketnine.space/tslocum/monovania/component"
 	"code.rocketnine.space/tslocum/monovania/engine"
 	"code.rocketnine.space/tslocum/monovania/world"
@@ -130,7 +131,7 @@ func (s *RenderSystem) Draw(ctx *gohan.Context, screen *ebiten.Image) error {
 	position := component.Position(ctx)
 	sprite := component.Sprite(ctx)
 
-	if sprite.NumFrames > 0 && time.Since(sprite.LastFrame) > sprite.FrameTime {
+	if sprite.NumFrames > 0 && !world.World.MessageVisible && time.Since(sprite.LastFrame) > sprite.FrameTime {
 		sprite.Frame++
 		if sprite.Frame >= sprite.NumFrames {
 			sprite.Frame = 0
@@ -144,8 +145,17 @@ func (s *RenderSystem) Draw(ctx *gohan.Context, screen *ebiten.Image) error {
 		colorScale = sprite.ColorScale
 	}
 
-	// TODO
-	var drawn int
-	drawn += s.renderSprite(position.X+world.World.OffsetX, position.Y+world.World.OffsetY, 0, 0, 0, 1.0, colorScale, 1.0, sprite.HorizontalFlip, sprite.VerticalFlip, sprite.Image, screen)
+	s.renderSprite(position.X+world.World.OffsetX, position.Y+world.World.OffsetY, 0, 0, 0, 1.0, colorScale, 1.0, sprite.HorizontalFlip, sprite.VerticalFlip, sprite.Image, screen)
+	if sprite.Overlay != nil {
+		offsetX := sprite.OverlayX
+		if sprite.HorizontalFlip {
+			offsetX *= -1
+		}
+		offsetY := sprite.OverlayY
+		if sprite.Image == asset.PlayerSS.WalkR1 || sprite.Image == asset.PlayerSS.WalkR2 {
+			offsetY -= 1
+		}
+		s.renderSprite(position.X+world.World.OffsetX+offsetX, position.Y+world.World.OffsetY+offsetY, 0, 0, 0, 1.0, colorScale, 1.0, sprite.HorizontalFlip, sprite.VerticalFlip, sprite.Overlay, screen)
+	}
 	return nil
 }

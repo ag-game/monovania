@@ -52,5 +52,6 @@ func parseFlags() {
 
 	if noSplash {
 		world.World.GameStarted = true
+		world.World.MessageVisible = false
 	}
 }

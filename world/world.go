@@ -66,12 +66,16 @@ type GameWorld struct {
 	Rewinding bool
 
 	MessageVisible bool
+	MessageUpdated bool
 	MessageTitle   string
 	MessageText    string
 
-	TriggerRects    []image.Rectangle
 	TriggerEntities []gohan.Entity
+	TriggerRects    []image.Rectangle
 	TriggerNames    []string
+
+	DestructibleEntities []gohan.Entity
+	DestructibleRects    []image.Rectangle
 
 	DisableEsc bool
 }
@@ -221,7 +225,7 @@ func LoadMap(filePath string) {
 	for _, grp := range World.ObjectGroups {
 		if grp.Name == "PLAYERSPAWN" {
 			for _, obj := range grp.Objects {
-				World.SpawnX, World.SpawnY = obj.X, obj.Y-1
+				World.SpawnX, World.SpawnY = obj.X, obj.Y-0.1
 			}
 			break
 		}
@@ -232,7 +236,7 @@ func LoadMap(filePath string) {
 		}
 		if grp.Name == "TEMPSPAWN" {
 			for _, obj := range grp.Objects {
-				World.SpawnX, World.SpawnY = obj.X, obj.Y-1
+				World.SpawnX, World.SpawnY = obj.X, obj.Y-0.1
 			}
 			break
 		}
@@ -244,10 +248,6 @@ func LoadMap(filePath string) {
 	for _, grp := range World.ObjectGroups {
 		if grp.Name == "TRIGGERS" {
 			for _, obj := range grp.Objects {
-				if obj.Name == "" {
-					continue
-				}
-
 				mapTile := engine.Engine.NewEntity()
 				engine.Engine.AddComponent(mapTile, &component.PositionComponent{
 					X: obj.X,
@@ -261,7 +261,24 @@ func LoadMap(filePath string) {
 				World.TriggerEntities = append(World.TriggerEntities, mapTile)
 				World.TriggerRects = append(World.TriggerRects, ObjectToRect(obj))
 			}
-			break
+		} else if grp.Name == "DESTRUCTIBLE" {
+			continue // TODO Fix destructible environment rects
+
+			for _, obj := range grp.Objects {
+				mapTile := engine.Engine.NewEntity()
+				engine.Engine.AddComponent(mapTile, &component.PositionComponent{
+					X: obj.X,
+					Y: obj.Y - 16,
+				})
+				engine.Engine.AddComponent(mapTile, &component.SpriteComponent{
+					Image: tileCache[obj.GID],
+				})
+				engine.Engine.AddComponent(mapTile, &component.DestructibleComponent{})
+
+				World.DestructibleEntities = append(World.DestructibleEntities, mapTile)
+				r := image.Rect(int(obj.X), int(obj.Y-32), int(obj.X+16), int(obj.Y-16))
+				World.DestructibleRects = append(World.DestructibleRects, r)
+			}
 		}
 	}
 }
@@ -269,4 +286,10 @@ func LoadMap(filePath string) {
 func ObjectToRect(o *tiled.Object) image.Rectangle {
 	x, y, w, h := int(o.X), int(o.Y), int(o.Width), int(o.Height)
 	return image.Rect(x, y, x+w, y+h)
+}
+
+func (w *GameWorld) SetMessage(message string) {
+	w.MessageText = message
+	w.MessageVisible = true
+	w.MessageUpdated = true
 }

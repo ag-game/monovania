@@ -20,7 +20,6 @@ func NewPlayer(x, y float64) gohan.Entity {
 	engine.Engine.AddComponent(player, &component.VelocityComponent{})
 
 	weapon := &component.WeaponComponent{
-		Ammo:        1000,
 		Damage:      1,
 		FireRate:    100 * time.Millisecond,
 		BulletSpeed: 15,

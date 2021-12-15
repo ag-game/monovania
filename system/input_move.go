@@ -1,6 +1,7 @@
 package system
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"time"
@@ -89,27 +90,33 @@ func (s *playerMoveSystem) Update(ctx *gohan.Context) error {
 		log.Printf("Spawn point set to %.0f,%.0f", world.World.SpawnX, world.World.SpawnY)
 		return nil
 	}
+	if ebiten.IsKeyPressed(ebiten.KeyControl) && inpututil.IsKeyJustPressed(ebiten.KeyK) {
+		if world.World.Keys < 3 {
+			world.World.Keys++
+		}
+		world.World.SetMessage(fmt.Sprintf("YOU NOW HAVE %d KEYS.", world.World.Keys))
+		return nil
+	}
+
+	if world.World.MessageVisible {
+		if inpututil.IsKeyJustPressed(ebiten.KeyEnter) {
+			world.World.MessageVisible = false
+		}
+		return nil
+	}
 
 	setWalkFrames := func() {
 		if world.World.NoClip {
 			return
 		}
 		sprite := component.Sprite(ctx)
-		if s.lastWalkDirL {
-			sprite.Frames = []*ebiten.Image{
-				asset.PlayerSS.WalkL1,
-				asset.PlayerSS.IdleL,
-				asset.PlayerSS.WalkL2,
-				asset.PlayerSS.IdleL,
-			}
-		} else {
-			sprite.Frames = []*ebiten.Image{
-				asset.PlayerSS.WalkR1,
-				asset.PlayerSS.IdleR,
-				asset.PlayerSS.WalkR2,
-				asset.PlayerSS.IdleR,
-			}
+		sprite.Frames = []*ebiten.Image{
+			asset.PlayerSS.WalkR1,
+			asset.PlayerSS.IdleR,
+			asset.PlayerSS.WalkR2,
+			asset.PlayerSS.IdleR,
 		}
+		sprite.HorizontalFlip = s.lastWalkDirL
 		sprite.NumFrames = 4
 		sprite.FrameTime = 150 * time.Millisecond
 	}
@@ -117,19 +124,12 @@ func (s *playerMoveSystem) Update(ctx *gohan.Context) error {
 	setJumpAndIdleFrames := func() {
 		sprite := component.Sprite(ctx)
 		sprite.NumFrames = 0
-		if s.lastWalkDirL {
-			if (s.movement.OnGround == -1 && s.movement.OnLadder == -1) || s.movement.Jumping || world.World.NoClip {
-				sprite.Image = asset.PlayerSS.WalkL2
-			} else {
-				sprite.Image = asset.PlayerSS.IdleL
-			}
+		if (s.movement.OnGround == -1 && s.movement.OnLadder == -1) || s.movement.Jumping || world.World.NoClip {
+			sprite.Image = asset.PlayerSS.WalkR2
 		} else {
-			if (s.movement.OnGround == -1 && s.movement.OnLadder == -1) || s.movement.Jumping || world.World.NoClip {
-				sprite.Image = asset.PlayerSS.WalkR2
-			} else {
-				sprite.Image = asset.PlayerSS.IdleR
-			}
+			sprite.Image = asset.PlayerSS.IdleR
 		}
+		sprite.HorizontalFlip = s.lastWalkDirL
 	}
 
 	// Rewind time.
@@ -237,11 +237,8 @@ func (s *playerMoveSystem) Update(ctx *gohan.Context) error {
 		// Duck and look down.
 		sprite := component.Sprite(ctx)
 		sprite.NumFrames = 0
-		if s.lastWalkDirL {
-			sprite.Image = asset.PlayerSS.DuckL
-		} else {
-			sprite.Image = asset.PlayerSS.DuckR
-		}
+		sprite.Image = asset.PlayerSS.DuckR
+		sprite.HorizontalFlip = s.lastWalkDirL
 		walkKeyPressed = true
 
 		if world.World.DuckStart == -1 {
@@ -298,11 +295,12 @@ func (s *playerMoveSystem) Update(ctx *gohan.Context) error {
 			if !world.World.NoClip {
 				sprite := component.Sprite(ctx)
 				sprite.Frames = []*ebiten.Image{
-					asset.PlayerSS.WalkL1,
-					asset.PlayerSS.IdleL,
-					asset.PlayerSS.WalkL2,
-					asset.PlayerSS.IdleL,
+					asset.PlayerSS.WalkR1,
+					asset.PlayerSS.IdleR,
+					asset.PlayerSS.WalkR2,
+					asset.PlayerSS.IdleR,
 				}
+				sprite.HorizontalFlip = true
 				sprite.NumFrames = 4
 				sprite.FrameTime = 150 * time.Millisecond
 			}
@@ -327,6 +325,7 @@ func (s *playerMoveSystem) Update(ctx *gohan.Context) error {
 					asset.PlayerSS.WalkR2,
 					asset.PlayerSS.IdleR,
 				}
+				sprite.HorizontalFlip = false
 				sprite.NumFrames = 4
 				sprite.FrameTime = 150 * time.Millisecond
 			}
@@ -373,7 +372,7 @@ func (s *playerMoveSystem) Update(ctx *gohan.Context) error {
 	}
 
 	if world.World.Levitating {
-		if ebiten.IsKeyPressed(ebiten.KeyW) {
+		if ebiten.IsKeyPressed(ebiten.KeyJ) {
 			if velocity.Y > -maxLevitateSpeed {
 				velocity.Y -= moveSpeed
 			}

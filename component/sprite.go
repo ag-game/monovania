@@ -15,6 +15,9 @@ type SpriteComponent struct {
 	VerticalFlip   bool
 	DiagonalFlip   bool // TODO unimplemented
 
+	Overlay            *ebiten.Image
+	OverlayX, OverlayY float64 // Overlay offset
+
 	Frame     int
 	Frames    []*ebiten.Image
 	FrameTime time.Duration

@@ -7,18 +7,13 @@ import (
 	"os"
 	"sync"
 
-	"code.rocketnine.space/tslocum/monovania/engine"
-
-	"code.rocketnine.space/tslocum/monovania/world"
-
-	"code.rocketnine.space/tslocum/monovania/component"
-
-	"code.rocketnine.space/tslocum/monovania/entity"
-
-	"code.rocketnine.space/tslocum/monovania/asset"
-
 	"code.rocketnine.space/tslocum/gohan"
+	"code.rocketnine.space/tslocum/monovania/asset"
+	"code.rocketnine.space/tslocum/monovania/component"
+	"code.rocketnine.space/tslocum/monovania/engine"
+	"code.rocketnine.space/tslocum/monovania/entity"
 	"code.rocketnine.space/tslocum/monovania/system"
+	"code.rocketnine.space/tslocum/monovania/world"
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/audio"
 	"golang.org/x/text/language"
@@ -100,6 +95,8 @@ func NewGame() (*game, error) {
 	}
 
 	asset.ImgWhiteSquare.Fill(color.White)
+
+	world.World.SetMessage("<J> TO JUMP.\n<R> TO REWIND.\n<WASD> TO MOVE.")
 
 	return g, nil
 }

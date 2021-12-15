@@ -8,7 +8,7 @@ import (
 )
 
 type WeaponComponent struct {
-	Ammo int
+	Equipped bool
 
 	Damage int
 

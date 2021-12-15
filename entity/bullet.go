@@ -21,7 +21,7 @@ func NewBullet(x, y, xSpeed, ySpeed float64) gohan.Entity {
 	})
 
 	engine.Engine.AddComponent(bullet, &component.SpriteComponent{
-		Image: asset.ImgWhiteSquare,
+		Image: asset.ImgBullet,
 	})
 
 	engine.Engine.AddComponent(bullet, &component.BulletComponent{})

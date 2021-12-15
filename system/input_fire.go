@@ -27,6 +27,7 @@ func NewFireWeaponSystem(player gohan.Entity) *fireWeaponSystem {
 func (_ *fireWeaponSystem) Needs() []gohan.ComponentID {
 	return []gohan.ComponentID{
 		component.PositionComponentID,
+		component.SpriteComponentID,
 		component.WeaponComponentID,
 	}
 }
@@ -35,55 +36,39 @@ func (_ *fireWeaponSystem) Uses() []gohan.ComponentID {
 	return nil
 }
 
-func (s *fireWeaponSystem) fire(weapon *component.WeaponComponent, position *component.PositionComponent, fireAngle float64) {
+func (s *fireWeaponSystem) fire(weapon *component.WeaponComponent, position *component.PositionComponent, sprite *component.SpriteComponent, fireAngle float64) {
 	if time.Since(weapon.LastFire) < weapon.FireRate {
 		return
 	}
 
-	weapon.Ammo--
 	weapon.LastFire = time.Now()
 
 	speedX := math.Cos(fireAngle) * -weapon.BulletSpeed
 	speedY := math.Sin(fireAngle) * -weapon.BulletSpeed
 
-	bullet := entity.NewBullet(position.X, position.Y, speedX, speedY)
+	offsetX := 8.0
+	if sprite.HorizontalFlip {
+		offsetX = -24
+	}
+	const bulletOffsetY = -5
+	bullet := entity.NewBullet(position.X+offsetX, position.Y+bulletOffsetY, speedX, speedY)
 	_ = bullet
 }
 
 func (s *fireWeaponSystem) Update(ctx *gohan.Context) error {
-	return nil // TODO
-
 	weapon := component.Weapon(ctx)
-
-	if weapon.Ammo <= 0 {
+	if !weapon.Equipped {
 		return nil
 	}
 
-	position := component.Position(ctx)
-
-	if ebiten.IsMouseButtonPressed(ebiten.MouseButtonLeft) {
-		cursorX, cursorY := ebiten.CursorPosition()
-		fireAngle := angle(position.X, position.Y, float64(cursorX), float64(cursorY))
-		s.fire(weapon, position, fireAngle)
-	}
-
-	switch {
-	case ebiten.IsKeyPressed(ebiten.KeyLeft) && ebiten.IsKeyPressed(ebiten.KeyUp):
-		s.fire(weapon, position, math.Pi/4)
-	case ebiten.IsKeyPressed(ebiten.KeyLeft) && ebiten.IsKeyPressed(ebiten.KeyDown):
-		s.fire(weapon, position, -math.Pi/4)
-	case ebiten.IsKeyPressed(ebiten.KeyRight) && ebiten.IsKeyPressed(ebiten.KeyUp):
-		s.fire(weapon, position, math.Pi*.75)
-	case ebiten.IsKeyPressed(ebiten.KeyRight) && ebiten.IsKeyPressed(ebiten.KeyDown):
-		s.fire(weapon, position, -math.Pi*.75)
-	case ebiten.IsKeyPressed(ebiten.KeyLeft):
-		s.fire(weapon, position, 0)
-	case ebiten.IsKeyPressed(ebiten.KeyRight):
-		s.fire(weapon, position, math.Pi)
-	case ebiten.IsKeyPressed(ebiten.KeyUp):
-		s.fire(weapon, position, math.Pi/2)
-	case ebiten.IsKeyPressed(ebiten.KeyDown):
-		s.fire(weapon, position, -math.Pi/2)
+	if ebiten.IsKeyPressed(ebiten.KeyL) {
+		position := component.Position(ctx)
+		sprite := component.Sprite(ctx)
+		fireAngle := math.Pi
+		if sprite.HorizontalFlip {
+			fireAngle = 0
+		}
+		s.fire(weapon, position, sprite, fireAngle)
 	}
 	return nil
 }

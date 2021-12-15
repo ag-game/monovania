@@ -1,12 +1,14 @@
 package system
 
 import (
+	"fmt"
 	"image"
 	"image/color"
 	"math"
 	"time"
 
 	"code.rocketnine.space/tslocum/gohan"
+	"code.rocketnine.space/tslocum/monovania/asset"
 	"code.rocketnine.space/tslocum/monovania/component"
 	"code.rocketnine.space/tslocum/monovania/engine"
 	"code.rocketnine.space/tslocum/monovania/world"
@@ -218,7 +220,9 @@ func (_ *MovementSystem) Needs() []gohan.ComponentID {
 }
 
 func (_ *MovementSystem) Uses() []gohan.ComponentID {
-	return nil
+	return []gohan.ComponentID{
+		component.WeaponComponentID,
+	}
 }
 
 func (s *MovementSystem) checkFire(ctx *gohan.Context, r image.Rectangle) {
@@ -234,18 +238,56 @@ func (s *MovementSystem) checkFire(ctx *gohan.Context, r image.Rectangle) {
 	}
 }
 
-func (s *MovementSystem) checkTriggers(r image.Rectangle) {
+func (s *MovementSystem) checkTriggers(ctx *gohan.Context, r image.Rectangle) {
 	for i, triggerRect := range world.World.TriggerRects {
 		if r.Overlaps(triggerRect) {
 			switch world.World.TriggerNames[i] {
 			case "DOUBLEJUMP":
 				world.World.CanDoubleJump = true
+
+				world.World.SetMessage("<J> TO DOUBLE JUMP.")
 			case "DASH":
 				world.World.CanDash = true
+
+				world.World.SetMessage("<K> TO DASH.")
+			case "LEVITATE":
+				world.World.CanLevitate = true
+
+				world.World.SetMessage("<J> TO LEVITATE AFTER DOUBLE JUMPING.")
 			case "KEY":
 				world.World.Keys++
+
+				if world.World.Keys == 1 {
+					world.World.SetMessage("FIRST EXIT KEY FOUND.")
+				} else if world.World.Keys == 1 {
+					world.World.SetMessage("SECOND EXIT KEY FOUND.")
+				} else {
+					world.World.SetMessage("FINAL EXIT KEY FOUND.")
+				}
+			case "UZI":
+				weapon := component.Weapon(ctx)
+				weapon.Equipped = true
+
+				sprite := engine.Engine.Component(world.World.Player, component.SpriteComponentID).(*component.SpriteComponent)
+				sprite.Overlay = asset.ImgUzi
+				sprite.OverlayX = 6
+				sprite.OverlayY = 7
+
+				world.World.SetMessage("<L> TO FIRE.")
+			case "EXIT":
+				if world.World.Keys < 3 {
+					position := component.Position(ctx)
+					velocity := component.Velocity(ctx)
+					position.X = position.X + 0.25
+					velocity.X = 0
+
+					world.World.SetMessage("THIS DOOR REQUIRES THREE KEYS.")
+					return
+				}
+
+				world.World.SetMessage("GAME OVER. YOU WIN!")
 			default:
-				panic("unknown trigger " + world.World.TriggerNames[i])
+				world.World.SetMessage(fmt.Sprintf("UNKNOWN TRIGGER '%s'.", world.World.TriggerNames[i]))
 			}
 
 			// Remove trigger.
@@ -254,8 +296,6 @@ func (s *MovementSystem) checkTriggers(r image.Rectangle) {
 			world.World.TriggerRects = append(world.World.TriggerRects[:i], world.World.TriggerRects[i+1:]...)
 			world.World.TriggerEntities = append(world.World.TriggerEntities[:i], world.World.TriggerEntities[i+1:]...)
 			world.World.TriggerNames = append(world.World.TriggerNames[:i], world.World.TriggerNames[i+1:]...)
-
-			// TODO Show ability info and usage popup.
 			return
 		}
 	}
@@ -263,11 +303,11 @@ func (s *MovementSystem) checkTriggers(r image.Rectangle) {
 
 func (s *MovementSystem) checkCollisions(ctx *gohan.Context, r image.Rectangle) {
 	s.checkFire(ctx, r)
-	s.checkTriggers(r)
+	s.checkTriggers(ctx, r)
 }
 
 func (s *MovementSystem) Update(ctx *gohan.Context) error {
-	if world.World.GameOver {
+	if world.World.MessageVisible || world.World.GameOver {
 		return nil
 	}
 
@@ -283,17 +323,19 @@ func (s *MovementSystem) Update(ctx *gohan.Context) error {
 		return nil
 	}
 
-	// TODO apply left and right X collision adjustments (too large, can hang entirely off edge of cliff)
+	if ctx.Entity == world.World.Player {
+		// TODO apply left and right X collision adjustments (too large, can hang entirely off edge of cliff)
 
-	onLadder := -1
-	playerRect := image.Rect(int(position.X), int(position.Y), int(position.X)+16, int(position.Y)+16)
-	for i, rect := range s.ladderRects {
-		if playerRect.Overlaps(rect) {
-			onLadder = i
-			break
+		onLadder := -1
+		playerRect := image.Rect(int(position.X), int(position.Y), int(position.X)+16, int(position.Y)+16)
+		for i, rect := range s.ladderRects {
+			if playerRect.Overlaps(rect) {
+				onLadder = i
+				break
+			}
 		}
+		s.OnLadder = onLadder
 	}
-	s.OnLadder = onLadder
 
 	// Apply weight and gravity.
 
@@ -320,89 +362,134 @@ func (s *MovementSystem) Update(ctx *gohan.Context) error {
 	}
 
 	vx, vy := velocity.X, velocity.Y
-	if world.World.Debug > 0 && ebiten.IsKeyPressed(ebiten.KeyShift) {
+	if (world.World.NoClip || world.World.Debug > 0) && ebiten.IsKeyPressed(ebiten.KeyShift) {
 		vx, vy = vx*2, vy*2
 	}
 
 	// Check collisions.
-
-	var (
-		collideX  = -1
-		collideY  = -1
-		collideXY = -1
-		collideG  = -1
-	)
-	const gravityThreshold = 4
-	playerRectX := image.Rect(int(position.X+vx), int(position.Y), int(position.X+vx)+16, int(position.Y)+17)
-	playerRectY := image.Rect(int(position.X), int(position.Y+vy), int(position.X)+16, int(position.Y+vy)+17)
-	playerRectXY := image.Rect(int(position.X+vx), int(position.Y+vy), int(position.X+vx)+16, int(position.Y+vy)+17)
-	playerRectG := image.Rect(int(position.X), int(position.Y+gravityThreshold), int(position.X)+16, int(position.Y+gravityThreshold)+17)
-	for i, rect := range s.collisionRects {
-		if world.World.NoClip {
-			continue
-		}
-		if playerRectX.Overlaps(rect) {
-			collideX = i
-			s.checkCollisions(ctx, playerRectX)
-		}
-		if playerRectY.Overlaps(rect) {
-			collideY = i
-			s.checkCollisions(ctx, playerRectY)
-		}
-		if playerRectXY.Overlaps(rect) {
-			collideXY = i
-			s.checkCollisions(ctx, playerRectXY)
-		}
-		if playerRectG.Overlaps(rect) {
-			collideG = i
-			s.checkCollisions(ctx, playerRectG)
-		}
-	}
-	if collideXY == -1 {
-		position.X, position.Y = position.X+vx, position.Y+vy
-	} else if collideX == -1 {
-		position.X = position.X + vx
-		velocity.Y = 0
-	} else if collideY == -1 {
-		position.Y = position.Y + vy
-		velocity.X = 0
-	} else {
-		velocity.X, velocity.Y = 0, 0
-	}
-	s.OnGround = collideG
-	if s.OnGround != -1 || s.OnLadder != -1 {
-		// Reset jump counter.
-		if world.World.Jumps != 0 && time.Since(s.LastJump) >= 50*time.Millisecond {
-			world.World.Jumps = 0
-		}
-		// Reset dash counter.
-		if world.World.Dashes != 0 {
-			world.World.Dashes = 0
-		}
-	}
-
-	// Remember positions to support rewinding time.
-	const recordTicks = 144 / 2
 	if ctx.Entity == world.World.Player {
-		if world.World.Rewinding {
-			s.playerPositionTicks = 0
-		} else {
-			s.playerPositionTicks++
-			if s.playerPositionTicks >= recordTicks || !s.recordedPosition {
-				s.RecordPosition(position)
-				s.playerPositionTicks = 0
-				s.recordedPosition = true
+		var (
+			collideX  = -1
+			collideY  = -1
+			collideXY = -1
+			collideG  = -1
+		)
+		const gravityThreshold = 4
+		playerRectX := image.Rect(int(position.X+vx), int(position.Y+1), int(position.X+vx)+16, int(position.Y)+17)
+		playerRectY := image.Rect(int(position.X), int(position.Y+1+vy), int(position.X)+16, int(position.Y+vy)+17)
+		playerRectXY := image.Rect(int(position.X+vx), int(position.Y+1+vy), int(position.X+vx)+16, int(position.Y+vy)+17)
+		playerRectG := image.Rect(int(position.X), int(position.Y+1+gravityThreshold), int(position.X)+16, int(position.Y+gravityThreshold)+17)
+		if !world.World.NoClip {
+			for i, rect := range s.collisionRects {
+				if playerRectX.Overlaps(rect) {
+					collideX = i
+					s.checkCollisions(ctx, playerRectX)
+				}
+				if playerRectY.Overlaps(rect) {
+					collideY = i
+					s.checkCollisions(ctx, playerRectY)
+				}
+				if playerRectXY.Overlaps(rect) {
+					collideXY = i
+					s.checkCollisions(ctx, playerRectXY)
+				}
+				if playerRectG.Overlaps(rect) {
+					collideG = i
+					s.checkCollisions(ctx, playerRectG)
+				}
+			}
+			for i, rect := range world.World.DestructibleRects {
+				if playerRectX.Overlaps(rect) {
+					collideX = i
+					s.checkCollisions(ctx, playerRectX)
+				}
+				if playerRectY.Overlaps(rect) {
+					collideY = i
+					s.checkCollisions(ctx, playerRectY)
+				}
+				if playerRectXY.Overlaps(rect) {
+					collideXY = i
+					s.checkCollisions(ctx, playerRectXY)
+				}
+				if playerRectG.Overlaps(rect) {
+					collideG = i
+					s.checkCollisions(ctx, playerRectG)
+				}
 			}
 		}
+		if collideXY == -1 {
+			position.X, position.Y = position.X+vx, position.Y+vy
+		} else if collideX == -1 {
+			position.X = position.X + vx
+			velocity.Y = 0
+		} else if collideY == -1 {
+			position.Y = position.Y + vy
+			velocity.X = 0
+		} else {
+			velocity.X, velocity.Y = 0, 0
+		}
+		s.OnGround = collideG
+		if s.OnGround != -1 || s.OnLadder != -1 {
+			// Reset jump counter.
+			if world.World.Jumps != 0 && time.Since(s.LastJump) >= 50*time.Millisecond {
+				world.World.Jumps = 0
+			}
+			// Reset dash counter.
+			if world.World.Dashes != 0 {
+				world.World.Dashes = 0
+			}
+		}
+
+		// Remember positions to support rewinding time.
+		const recordTicks = 144 / 2
+		if ctx.Entity == world.World.Player {
+			if world.World.Rewinding {
+				s.playerPositionTicks = 0
+			} else {
+				s.playerPositionTicks++
+				if s.playerPositionTicks >= recordTicks || !s.recordedPosition {
+					s.RecordPosition(position)
+					s.playerPositionTicks = 0
+					s.recordedPosition = true
+				}
+			}
+		}
+		// TODO: Does this use enough memory to require pruning positions?
+
+		// Update debug rects.
+
+		if s.OnGround != lastOnGround || s.OnLadder != lastOnLadder {
+			s.UpdateDebugCollisionRects()
+		}
+	} else {
+		position.X, position.Y = position.X+vx, position.Y+vy
+
+		bulletOffsetX := 0.0
+		bulletOffsetY := 1.0
+		bulletWidth := 1.0
+
+		bulletRectSmall := image.Rect(int(position.X+bulletOffsetX), int(position.Y+bulletOffsetY), int(position.X+bulletOffsetX+bulletWidth), int(position.Y+bulletOffsetY+bulletWidth))
+		bulletWidth = 5.0
+		bulletRectLarge := image.Rect(int(position.X+bulletOffsetX), int(position.Y+bulletOffsetY), int(position.X+bulletOffsetX+bulletWidth), int(position.Y+bulletOffsetY+bulletWidth))
+		for i, r := range world.World.DestructibleRects {
+			if r.Overlaps(bulletRectSmall) {
+				// Hit destructible.
+				ctx.RemoveEntity()
+				engine.Engine.RemoveEntity(world.World.DestructibleEntities[i])
+				world.World.DestructibleRects = append(world.World.DestructibleRects[:i], world.World.DestructibleRects[i+1:]...)
+				world.World.DestructibleEntities = append(world.World.DestructibleEntities[:i], world.World.DestructibleEntities[i+1:]...)
+				return nil
+			}
+		}
+		for _, r := range s.collisionRects {
+			if r.Overlaps(bulletRectSmall) {
+				// Hit wall.
+				ctx.RemoveEntity()
+				return nil
+			}
+		}
+		_ = bulletRectLarge
 	}
-	// TODO: Does this use enough memory to require pruning positions?
-
-	// Update debug rects.
-
-	if s.OnGround != lastOnGround || s.OnLadder != lastOnLadder {
-		s.UpdateDebugCollisionRects()
-	}
-
 	return nil
 }
 
